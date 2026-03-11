@@ -1,0 +1,5 @@
+﻿username;last_name;first_name;middle_name;phone;email;role;school_id;is_active
+admin;Адміністратор;Системний;;;admin@navirver.local;system_admin;;True
+1;;;;;;school_admin;1;True
+2;;;;;;teacher;1;True
+3;3;3;3;3;3@2.1;student;1;True

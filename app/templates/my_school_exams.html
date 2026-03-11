@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Мої іспити - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <h1 style="margin-bottom: 1.5rem;">📝 Мої шкільні іспити</h1>
+
+    <!-- Доступні іспити -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📋 Доступні для проходження</h2>
+        </div>
+        
+        {% if available_exams %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва іспиту</th>
+                        <th>Група</th>
+                        <th>Категорія</th>
+                        <th>Питань</th>
+                        <th>Час</th>
+                        <th>Доп. помилок</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in available_exams %}
+                    <tr>
+                        <td><strong>{{ item.exam.name }}</strong></td>
+                        <td>{{ item.group.name }}</td>
+                        <td>{{ item.exam.category.name }}</td>
+                        <td>{{ item.exam.question_count }}</td>
+                        <td>{{ item.exam.time_minutes }} хв</td>
+                        <td>{{ item.exam.max_errors }}</td>
+                        <td>
+                            {% if item.result and item.result.status == 'in_progress' %}
+                                <a href="{{ url_for('main.school_exam_question') }}" class="btn btn-warning btn-sm">
+                                    <span>▶️</span> Продовжити
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for('main.start_school_exam', exam_id=item.exam.id) }}" class="btn btn-success btn-sm"
+                                   onclick="return confirm('Розпочати іспит &quot;{{ item.exam.name }}&quot;? У вас буде {{ item.exam.time_minutes }} хвилин на {{ item.exam.question_count }} питань.')">
+                                    <span>▶️</span> Розпочати
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>Немає доступних іспитів</p>
+            <p style="font-size: 0.9rem; color: var(--text-secondary);">
+                Іспити з'являться тут, коли викладач їх активує
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Завершені іспити -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">✅ Пройдені іспити</h2>
+        </div>
+        
+        {% if completed_results %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва іспиту</th>
+                        <th>Група</th>
+                        <th>Категорія</th>
+                        <th>Дата</th>
+                        <th>Результат</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in completed_results %}
+                    <tr>
+                        <td><strong>{{ result.exam.name }}</strong></td>
+                        <td>{{ result.exam.group.name }}</td>
+                        <td>{{ result.exam.category.name }}</td>
+                        <td>{{ result.completed_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            {% if result.is_passed %}
+                                <span class="badge badge-success">✓ Складено</span>
+                                <br><small>{{ result.correct_answers }}/{{ result.total_questions }} правильно</small>
+                            {% else %}
+                                <span class="badge badge-danger">✗ Не складено</span>
+                                <br><small>{{ result.errors_count }} помилок (допустимо: {{ result.exam.max_errors }})</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('main.school_exam_result', result_id=result.id) }}" class="btn btn-primary btn-sm">
+                                👁️ Переглянути
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">✅</div>
+            <p>Ви ще не проходили іспити</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

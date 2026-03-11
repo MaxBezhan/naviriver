@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "last_name": "Адміністратор",
+    "first_name": "Системний",
+    "middle_name": null,
+    "phone": null,
+    "email": "admin@navirver.local",
+    "role": "system_admin",
+    "school_id": null,
+    "is_active": true,
+    "account_expires_at": null,
+    "data_processing_consent": true
+  },
+  {
+    "id": 2,
+    "username": "1",
+    "last_name": "",
+    "first_name": "",
+    "middle_name": "",
+    "phone": "",
+    "email": "",
+    "role": "school_admin",
+    "school_id": 1,
+    "is_active": true,
+    "account_expires_at": null,
+    "data_processing_consent": false
+  },
+  {
+    "id": 3,
+    "username": "2",
+    "last_name": "",
+    "first_name": "",
+    "middle_name": "",
+    "phone": "",
+    "email": "",
+    "role": "teacher",
+    "school_id": 1,
+    "is_active": true,
+    "account_expires_at": null,
+    "data_processing_consent": false
+  },
+  {
+    "id": 4,
+    "username": "3",
+    "last_name": "3",
+    "first_name": "3",
+    "middle_name": "3",
+    "phone": "3",
+    "email": "3@2.1",
+    "role": "student",
+    "school_id": 1,
+    "is_active": true,
+    "account_expires_at": "2026-03-10T00:27:27.185191",
+    "data_processing_consent": true
+  }
+]

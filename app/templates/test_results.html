@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Результати - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="test-container fade-in">
+    <!-- Заголовок результатів -->
+    <div class="results-header">
+        {% set score = test_session.get_score_percent() %}
+        {% set is_passed = score >= 70 %}
+        
+        <div class="score-circle" style="border-color: {{ '#22c55e' if is_passed else '#ef4444' }};">
+            <div class="score-value">{{ score }}%</div>
+            <div class="score-label">{{ 'Здано' if is_passed else 'Не здано' }}</div>
+        </div>
+        
+        <h1>{{ 'Вітаємо! 🎉' if is_passed else 'Потрібно більше практики 📚' }}</h1>
+        <p style="color: var(--text-secondary);">
+            Режим: <strong>{{ test_session.mode }}</strong> | 
+            Тривалість: <strong>{{ test_session.get_duration_formatted() }}</strong>
+        </p>
+    </div>
+
+    <!-- Деталі результатів -->
+    <div class="card">
+        <div class="results-details">
+            <div class="result-item">
+                <div class="result-value success">{{ test_session.correct_count }}</div>
+                <div style="color: var(--text-secondary);">Правильно</div>
+            </div>
+            <div class="result-item">
+                <div class="result-value danger">{{ test_session.questions_count - test_session.correct_count }}</div>
+                <div style="color: var(--text-secondary);">Неправильно</div>
+            </div>
+            <div class="result-item">
+                <div class="result-value">{{ test_session.questions_count }}</div>
+                <div style="color: var(--text-secondary);">Всього питань</div>
+            </div>
+            <div class="result-item">
+                <div class="result-value">{{ test_session.get_duration_formatted() }}</div>
+                <div style="color: var(--text-secondary);">Час</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Детальний розбір -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">📋 Детальний розбір</h2>
+            <button class="btn btn-outline btn-sm" onclick="printResults()">
+                <span>🖨️</span> Друк
+            </button>
+        </div>
+
+        {% for answer in answers %}
+        <div class="result-detail-card {{ 'correct' if answer.is_correct else 'wrong' }}">
+            <div class="result-detail-header">
+                <span class="result-detail-number">Питання {{ loop.index }} | Розділ {{ answer.question.section }}</span>
+                <span class="result-detail-status {{ 'correct' if answer.is_correct else 'wrong' }}">
+                    {{ '✓ Правильно' if answer.is_correct else '✗ Неправильно' }}
+                </span>
+            </div>
+            
+            <!-- Текст питання -->
+            <div class="result-detail-question">
+                {{ answer.question.text }}
+            </div>
+            
+            {% if answer.question.image_base64 %}
+            <img src="{{ answer.question.image_base64 }}" alt="Зображення" style="max-width: 100%; max-height: 200px; border-radius: var(--radius); margin-bottom: 0.75rem;">
+            {% endif %}
+            
+            <!-- Варіанти відповідей -->
+            <div style="margin-top: 0.75rem;">
+                {% set options = answer.question.get_options() %}
+                
+                <!-- Обрана відповідь -->
+                {% if answer.selected_option is not none %}
+                <div class="result-detail-answer selected">
+                    <strong>Ваша відповідь:</strong>
+                    {{ options[answer.selected_option] }}
+                </div>
+                {% else %}
+                <div class="result-detail-answer" style="background: #f3f4f6; border: 1px solid #d1d5db;">
+                    <strong>Ваша відповідь:</strong>
+                    <span style="color: var(--text-secondary);">Не відповіли</span>
+                </div>
+                {% endif %}
+                
+                <!-- Правильна відповідь (якщо неправильно) -->
+                {% if not answer.is_correct %}
+                <div class="result-detail-answer correct">
+                    <strong>Правильна відповідь:</strong>
+                    {{ options[answer.question.correct] }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Дії -->
+    <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; flex-wrap: wrap;">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary btn-lg">
+            <span>🏠</span> На головну
+        </a>
+        
+        {% if not is_passed %}
+        <form method="POST" action="{{ url_for('main.start_test') }}" style="display: inline;">
+            <input type="hidden" name="mode" value="mistakes">
+            <button type="submit" class="btn btn-warning btn-lg">
+                <span>❌</span> Працювати над помилками
+            </button>
+        </form>
+        {% endif %}
+        
+        <a href="{{ url_for('main.statistics') }}" class="btn btn-outline btn-lg">
+            <span>📊</span> Статистика
+        </a>
+    </div>
+</div>
+
+<script>
+function printResults() {
+    window.print();
+}
+</script>
+
+<style>
+@media print {
+    .navbar, .btn { display: none !important; }
+    .card { break-inside: avoid; }
+}
+</style>
+{% endblock %}

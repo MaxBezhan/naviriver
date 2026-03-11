@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика іспитів - {{ group.name }} - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <div>
+            <h1>📊 Статистика іспитів</h1>
+            <p style="color: var(--text-secondary);">
+                Група: <strong>{{ group.name }}</strong> | 
+                Викладач: <strong>{{ group.teacher.get_full_name() or group.teacher.username }}</strong> | 
+                Слухачів: <strong>{{ group.get_students_count() }}</strong>
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('main.group_detail', group_id=group.id) }}" class="btn btn-outline">
+                <span>←</span> Назад до групи
+            </a>
+        </div>
+    </div>
+
+    <!-- Загальна статистика по групі -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📈 Загальна статистика</h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">{{ group.get_students_count() }}</div>
+                    <div style="color: var(--text-secondary);">Всього слухачів</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--info-color);">{{ group.exams|length }}</div>
+                    <div style="color: var(--text-secondary);">Всього іспитів</div>
+                </div>
+                {% set total_passed = namespace(value=0) %}
+                {% set total_completed = namespace(value=0) %}
+                {% for stat in exams_stats %}
+                    {% set total_passed.value = total_passed.value + stat.passed_count %}
+                    {% set total_completed.value = total_completed.value + stat.completed_count %}
+                {% endfor %}
+                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--success-color);">{{ total_passed.value }}</div>
+                    <div style="color: var(--text-secondary);">Складено іспитів</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--warning-color);">{{ total_completed.value - total_passed.value }}</div>
+                    <div style="color: var(--text-secondary);">Не складено</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика по кожному іспиту -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📝 Статистика по іспитах</h2>
+        </div>
+        
+        {% if exams_stats %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва іспиту</th>
+                        <th>Категорія</th>
+                        <th>Пройшли</th>
+                        <th>Складено</th>
+                        <th>Не складено</th>
+                        <th>В процесі</th>
+                        <th>Не розпочали</th>
+                        <th>Середній час</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in exams_stats %}
+                    <tr>
+                        <td><strong>{{ stat.exam.name }}</strong></td>
+                        <td>{{ stat.exam.category.name }}</td>
+                        <td>{{ stat.completed_count }} / {{ stat.total_students }}</td>
+                        <td><span class="badge badge-success">{{ stat.passed_count }}</span></td>
+                        <td><span class="badge badge-danger">{{ stat.failed_count }}</span></td>
+                        <td><span class="badge badge-warning">{{ stat.in_progress_count }}</span></td>
+                        <td><span class="badge badge-secondary">{{ stat.not_started_count }}</span></td>
+                        <td>
+                            {% if stat.avg_time > 0 %}
+                                {{ (stat.avg_time // 60)|int }}:{{ (stat.avg_time % 60)|int|string|format('%02d') }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('main.exam_dashboard', group_id=group.id, exam_id=stat.exam.id) }}" class="btn btn-primary btn-sm">
+                                📊 Деталі
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <p>У групи ще немає іспитів</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Детальна статистика по вибраному іспиту -->
+    {% if exam_details %}
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary-color);">
+        <div class="card-header">
+            <h2 class="card-title">📋 Деталі іспиту: {{ exam_details.exam.name }}</h2>
+            <span class="badge badge-info">{{ exam_details.exam.category.name }}</span>
+        </div>
+        <div style="padding: 1.5rem;">
+            <!-- Прогрес проходження -->
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem;">Прогрес проходження</h3>
+                <div style="display: flex; height: 30px; border-radius: 15px; overflow: hidden; margin-bottom: 1rem;">
+                    {% set total = exam_details.total_students %}
+                    {% set passed_width = (exam_details.passed_count / total * 100) if total > 0 else 0 %}
+                    {% set failed_width = (exam_details.failed_count / total * 100) if total > 0 else 0 %}
+                    {% set in_progress_width = (exam_details.in_progress_count / total * 100) if total > 0 else 0 %}
+                    {% set not_started_width = (exam_details.not_started_count / total * 100) if total > 0 else 0 %}
+                    
+                    {% if passed_width > 0 %}
+                    <div style="width: {{ passed_width }}%; background: var(--success-color);" title="Складено: {{ exam_details.passed_count }}"></div>
+                    {% endif %}
+                    {% if failed_width > 0 %}
+                    <div style="width: {{ failed_width }}%; background: var(--danger-color);" title="Не складено: {{ exam_details.failed_count }}"></div>
+                    {% endif %}
+                    {% if in_progress_width > 0 %}
+                    <div style="width: {{ in_progress_width }}%; background: var(--warning-color);" title="В процесі: {{ exam_details.in_progress_count }}"></div>
+                    {% endif %}
+                    {% if not_started_width > 0 %}
+                    <div style="width: {{ not_started_width }}%; background: var(--secondary-color);" title="Не розпочали: {{ exam_details.not_started_count }}"></div>
+                    {% endif %}
+                </div>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--success-color); border-radius: 2px; margin-right: 0.25rem;"></span>Складено: {{ exam_details.passed_count }}</span>
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--danger-color); border-radius: 2px; margin-right: 0.25rem;"></span>Не складено: {{ exam_details.failed_count }}</span>
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--warning-color); border-radius: 2px; margin-right: 0.25rem;"></span>В процесі: {{ exam_details.in_progress_count }}</span>
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--secondary-color); border-radius: 2px; margin-right: 0.25rem;"></span>Не розпочали: {{ exam_details.not_started_count }}</span>
+                </div>
+            </div>
+
+            <!-- Результати слухачів -->
+            <h3 style="margin-bottom: 1rem;">Результати слухачів</h3>
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Слухач</th>
+                            <th>Статус</th>
+                            <th>Результат</th>
+                            <th>Час</th>
+                            <th>Правильно</th>
+                            <th>Помилок</th>
+                            <th>Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exam_details.student_results %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.student.get_full_name() or item.student.username }}</strong>
+                            </td>
+                            <td>
+                                {% if item.result %}
+                                    {% if item.result.status == 'completed' %}
+                                        <span class="badge badge-success">Завершено</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">В процесі</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge badge-secondary">Не розпочато</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.result and item.result.status == 'completed' %}
+                                    {% if item.result.is_passed %}
+                                        <span class="badge badge-success">✓ Складено</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">✗ Не складено</span>
+                                    {% endif %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.result %}
+                                    {{ item.result.get_time_spent_formatted() }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.result %}
+                                    {{ item.result.correct_answers }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.result %}
+                                    {{ item.result.errors_count }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td class="actions">
+                                {% if item.result %}
+                                    <a href="{{ url_for('main.school_exam_result', result_id=item.result.id) }}" class="btn btn-primary btn-xs" title="Переглянути">
+                                        👁️
+                                    </a>
+                                    {% if current_user.role in ['school_admin', 'system_admin'] %}
+                                    <form method="POST" action="{{ url_for('main.reset_school_exam_result', result_id=item.result.id) }}" 
+                                          style="display: inline;"
+                                          onsubmit="return confirm('СКИНУТИ результат для &quot;{{ item.student.get_full_name() or item.student.username }}&quot;?')">
+                                        <button type="submit" class="btn btn-warning btn-xs" title="Скинути результат">
+                                            🔄
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: var(--text-secondary);">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

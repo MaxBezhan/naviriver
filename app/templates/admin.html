@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+
+{% block title %}Адмін-панель - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <h1 style="margin-bottom: 2rem;">⚙️ Адмін-панель</h1>
+
+    <!-- Статистика системи -->
+    <div class="admin-stats">
+        <div class="admin-stat">
+            <div class="admin-stat-value">{{ total_users }}</div>
+            <div class="admin-stat-label">Користувачів</div>
+        </div>
+        <div class="admin-stat">
+            <div class="admin-stat-value">{{ total_questions }}</div>
+            <div class="admin-stat-label">Питань</div>
+        </div>
+        <div class="admin-stat">
+            <div class="admin-stat-value">{{ total_tests }}</div>
+            <div class="admin-stat-label">Тестів</div>
+        </div>
+        <div class="admin-stat">
+            <div class="admin-stat-value">{{ total_schools }}</div>
+            <div class="admin-stat-label">Закладів</div>
+        </div>
+    </div>
+
+    <!-- Заклади (спочатку) -->
+    {% if current_user.role == 'system_admin' %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">🏫 Заклади</h2>
+            <button class="btn btn-success btn-sm" onclick="openModal('add-school-modal')">
+                <span>➕</span> Додати
+            </button>
+        </div>
+        
+        {% if schools %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва</th>
+                        <th>Адреса</th>
+                        <th>Телефон</th>
+                        <th>Email</th>
+                        <th>Користувачів</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school in schools %}
+                    <tr>
+                        <td>{{ school.name }}</td>
+                        <td>{{ school.address or '—' }}</td>
+                        <td>{{ school.phone or '—' }}</td>
+                        <td>{{ school.email or '—' }}</td>
+                        <td>{{ school.users|length }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">🏫</div>
+            <p>Ще немає закладів</p>
+        </div>
+        {% endif %}
+    </div>
+    {% elif current_user.role == 'school_admin' and current_user.school %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">🏫 Мій заклад</h2>
+        </div>
+        <div style="padding: 1rem;">
+            <p><strong>Назва:</strong> {{ current_user.school.name }}</p>
+            <p><strong>Адреса:</strong> {{ current_user.school.address or '—' }}</p>
+            <p><strong>Телефон:</strong> {{ current_user.school.phone or '—' }}</p>
+            <p><strong>Email:</strong> {{ current_user.school.email or '—' }}</p>
+            <p><strong>Користувачів:</strong> {{ current_user.school.users|length }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Користувачі (під школами) -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">👥 Користувачі</h2>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-success btn-sm" onclick="openModal('add-user-modal')">
+                    <span>➕</span> Додати
+                </button>
+                {% if current_user.role == 'system_admin' %}
+                <a href="{{ url_for('main.export_users', format='json') }}" class="btn btn-outline btn-sm">📤 JSON</a>
+                <a href="{{ url_for('main.export_users', format='csv') }}" class="btn btn-outline btn-sm">📤 CSV</a>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Користувач</th>
+                        <th>Роль</th>
+                        <th>Статус</th>
+                        <th>Термін дії</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            <strong>{{ user.username }}</strong>
+                            {% if user.get_full_name() %}<br><small>{{ user.get_full_name() }}</small>{% endif %}
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if user.role == 'system_admin' %}badge-danger
+                                {% elif user.role == 'school_admin' %}badge-warning
+                                {% elif user.role == 'teacher' %}badge-info
+                                {% else %}badge-success{% endif %}">
+                                {{ user.get_role_display() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user.is_active %}
+                                <span class="badge badge-success">Активний</span>
+                            {% else %}
+                                <span class="badge badge-danger">Неактивний</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.account_expires_at %}
+                                {{ user.account_expires_at.strftime('%d.%m.%Y') }}
+                            {% else %}
+                                <span style="color: var(--text-secondary);">Безстроково</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            {% if current_user.can_edit_user(user) %}
+                            <button class="btn btn-primary btn-xs" onclick="editUser({{ user.id }})" title="Редагувати">
+                                ✏️
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('main.user_login_logs', user_id=user.id) }}" 
+                               class="btn btn-info btn-xs" title="Логи входів">
+                                📋
+                            </a>
+                            {% if user.role == 'student' and current_user.can_edit_user(user) %}
+                            <button class="btn btn-info btn-xs" onclick="openAssignTeacherModal({{ user.id }}, '{{ user.username }}')" title="Призначити викладача">
+                                👨‍🏫
+                            </button>
+                            {% endif %}
+                            {% if current_user.can_edit_user(user) %}
+                            <a href="{{ url_for('main.reset_password', user_id=user.id) }}" 
+                               class="btn btn-warning btn-xs" title="Скинути пароль"
+                               onclick="return confirm('Скинути пароль для {{ user.username }}?')">
+                                🔑
+                            </a>
+                            <a href="{{ url_for('main.reset_user_stats', user_id=user.id) }}" 
+                               class="btn btn-secondary btn-xs" title="Скинути статистику"
+                               onclick="return confirm('Скинути статистику для {{ user.username }}?')">
+                                📊
+                            </a>
+                            {% if user.id != current_user.id %}
+                            <a href="{{ url_for('main.toggle_user', user_id=user.id) }}" 
+                               class="btn btn-{{ 'danger' if user.is_active else 'success' }} btn-xs"
+                               title="{{ 'Деактивувати' if user.is_active else 'Активувати' }}">
+                                {{ '🚫' if user.is_active else '✓' }}
+                            </a>
+                            <form method="POST" action="{{ url_for('main.delete_user', user_id=user.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('ВИДАЛИТИ користувача {{ user.username }}? Цю дію неможливо скасувати!')">
+                                <button type="submit" class="btn btn-danger btn-xs" title="Видалити">
+                                    🗑️
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if current_user.role == 'system_admin' %}
+    <!-- Імпорт користувачів -->
+    <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📥 Імпорт користувачів</h2>
+        </div>
+        <form method="POST" action="{{ url_for('main.import_users') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Файл JSON з користувачами</label>
+                <input type="file" class="form-control" name="file" accept=".json" required>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <span>📤</span> Імпортувати
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Модальне вікно: Додати користувача -->
+<div class="modal-overlay" id="add-user-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">➕ Додати користувача</h3>
+            <button class="modal-close" onclick="closeModal('add-user-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.add_user') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Ім'я користувача *</label>
+                    <input type="text" class="form-control" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Прізвище</label>
+                    <input type="text" class="form-control" name="last_name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ім'я</label>
+                    <input type="text" class="form-control" name="first_name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">По батькові</label>
+                    <input type="text" class="form-control" name="middle_name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Телефон</label>
+                    <input type="tel" class="form-control" name="phone">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Роль *</label>
+                    <select class="form-select" name="role" required>
+                        <option value="student">Слухач</option>
+                        <option value="teacher">Викладач</option>
+                        {% if current_user.role == 'system_admin' %}
+                        <option value="school_admin">Адміністратор школи</option>
+                        <option value="system_admin">Системний адміністратор</option>
+                        {% endif %}
+                    </select>
+                </div>
+                {% if current_user.role == 'system_admin' %}
+                <div class="form-group">
+                    <label class="form-label">Заклад</label>
+                    <select class="form-select" name="school_id">
+                        <option value="">—</option>
+                        {% for school in schools %}
+                        <option value="{{ school.id }}">{{ school.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="form-group">
+                    <label class="form-label">Термін дії</label>
+                    <select class="form-select" name="expiry_type" onchange="toggleExpiryFields(this)">
+                        <option value="unlimited">Безстроково</option>
+                        <option value="days">Кількість днів</option>
+                        <option value="date">До конкретної дати</option>
+                    </select>
+                </div>
+                <div class="form-group" id="expiry-days-field" style="display: none;">
+                    <label class="form-label">Кількість днів</label>
+                    <input type="number" class="form-control" name="expiry_days" value="30" min="1">
+                </div>
+                <div class="form-group" id="expiry-date-field" style="display: none;">
+                    <label class="form-label">Дата закінчення</label>
+                    <input type="date" class="form-control" name="expiry_date">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" name="is_active" checked>
+                        Активний
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('add-user-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Додати</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Модальне вікно: Призначити викладача -->
+<div class="modal-overlay" id="assign-teacher-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">👨‍🏫 Призначити викладача</h3>
+            <button class="modal-close" onclick="closeModal('assign-teacher-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.assign_teacher') }}">
+            <div class="modal-body">
+                <input type="hidden" name="student_id" id="assign-student-id">
+                <p>Слухач: <strong id="assign-student-name"></strong></p>
+                <div class="form-group">
+                    <label class="form-label">Викладач *</label>
+                    <select class="form-select" name="teacher_id" required>
+                        <option value="">Виберіть викладача</option>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}">{{ teacher.get_full_name() or teacher.username }} ({{ teacher.get_role_display() }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('assign-teacher-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Призначити</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if current_user.role == 'system_admin' %}
+<!-- Модальне вікно: Додати заклад -->
+<div class="modal-overlay" id="add-school-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">➕ Додати заклад</h3>
+            <button class="modal-close" onclick="closeModal('add-school-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.add_school') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Назва *</label>
+                    <input type="text" class="form-control" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Адреса</label>
+                    <input type="text" class="form-control" name="address">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Телефон</label>
+                    <input type="tel" class="form-control" name="phone">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('add-school-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Додати</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальне вікно: Редагувати користувача -->
+<div class="modal-overlay" id="edit-user-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ Редагувати користувача</h3>
+            <button class="modal-close" onclick="closeModal('edit-user-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.admin_edit_user') }}">
+            <input type="hidden" name="user_id" id="edit-user-id">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Прізвище</label>
+                    <input type="text" class="form-control" name="last_name" id="edit-last-name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ім'я</label>
+                    <input type="text" class="form-control" name="first_name" id="edit-first-name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">По батькові</label>
+                    <input type="text" class="form-control" name="middle_name" id="edit-middle-name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Телефон</label>
+                    <input type="tel" class="form-control" name="phone" id="edit-phone">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" id="edit-email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Роль</label>
+                    <select class="form-select" name="role" id="edit-role">
+                        <option value="student">Слухач</option>
+                        <option value="teacher">Викладач</option>
+                        {% if current_user.role == 'system_admin' %}
+                        <option value="school_admin">Адміністратор школи</option>
+                        <option value="system_admin">Системний адміністратор</option>
+                        {% endif %}
+                    </select>
+                </div>
+                {% if current_user.role == 'system_admin' %}
+                <div class="form-group">
+                    <label class="form-label">Заклад</label>
+                    <select class="form-select" name="school_id" id="edit-school-id">
+                        <option value="">—</option>
+                        {% for school in schools %}
+                        <option value="{{ school.id }}">{{ school.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="form-group">
+                    <label class="form-label">Термін дії</label>
+                    <select class="form-select" name="expiry_type" id="edit-expiry-type" onchange="toggleEditExpiryFields(this)">
+                        <option value="unlimited">Безстроково</option>
+                        <option value="days">Кількість днів</option>
+                        <option value="date">До конкретної дати</option>
+                    </select>
+                </div>
+                <div class="form-group" id="edit-expiry-days-field" style="display: none;">
+                    <label class="form-label">Кількість днів</label>
+                    <input type="number" class="form-control" name="expiry_days" value="30" min="1">
+                </div>
+                <div class="form-group" id="edit-expiry-date-field" style="display: none;">
+                    <label class="form-label">Дата закінчення</label>
+                    <input type="date" class="form-control" name="expiry_date" id="edit-expiry-date">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" name="is_active" id="edit-is-active" checked>
+                        Активний
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('edit-user-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-primary">Зберегти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const usersData = {{ users | map(attribute='id') | list | tojson }};
+
+function toggleExpiryFields(select) {
+    const daysField = document.getElementById('expiry-days-field');
+    const dateField = document.getElementById('expiry-date-field');
+    
+    daysField.style.display = 'none';
+    dateField.style.display = 'none';
+    
+    if (select.value === 'days') {
+        daysField.style.display = 'block';
+    } else if (select.value === 'date') {
+        dateField.style.display = 'block';
+    }
+}
+
+function toggleEditExpiryFields(select) {
+    const daysField = document.getElementById('edit-expiry-days-field');
+    const dateField = document.getElementById('edit-expiry-date-field');
+    
+    daysField.style.display = 'none';
+    dateField.style.display = 'none';
+    
+    if (select.value === 'days') {
+        daysField.style.display = 'block';
+    } else if (select.value === 'date') {
+        dateField.style.display = 'block';
+    }
+}
+
+function editUser(userId) {
+    // Завантажуємо дані користувача через AJAX
+    fetch('/admin/user/' + userId + '/data')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('edit-user-id').value = data.id;
+            document.getElementById('edit-last-name').value = data.last_name || '';
+            document.getElementById('edit-first-name').value = data.first_name || '';
+            document.getElementById('edit-middle-name').value = data.middle_name || '';
+            document.getElementById('edit-phone').value = data.phone || '';
+            document.getElementById('edit-email').value = data.email || '';
+            document.getElementById('edit-role').value = data.role;
+            document.getElementById('edit-school-id').value = data.school_id || '';
+            document.getElementById('edit-is-active').checked = data.is_active;
+            
+            // Налаштування терміну дії
+            const expiryTypeSelect = document.getElementById('edit-expiry-type');
+            const expiryDateField = document.getElementById('edit-expiry-date-field');
+            const expiryDateInput = document.getElementById('edit-expiry-date');
+            
+            if (data.account_expires_at) {
+                expiryTypeSelect.value = 'date';
+                expiryDateField.style.display = 'block';
+                // Перетворюємо ISO дату в формат yyyy-MM-dd для input type="date"
+                const expiryDate = new Date(data.account_expires_at);
+                expiryDateInput.value = expiryDate.toISOString().split('T')[0];
+            } else {
+                expiryTypeSelect.value = 'unlimited';
+                expiryDateField.style.display = 'none';
+                expiryDateInput.value = '';
+            }
+            
+            document.getElementById('edit-expiry-days-field').style.display = 'none';
+            
+            document.getElementById('edit-user-modal').classList.add('active');
+        })
+        .catch(error => {
+            console.error('Помилка:', error);
+            alert('Не вдалося завантажити дані користувача');
+        });
+}
+
+function openAssignTeacherModal(studentId, studentName) {
+    document.getElementById('assign-student-id').value = studentId;
+    document.getElementById('assign-student-name').textContent = studentName;
+    document.getElementById('assign-teacher-modal').classList.add('active');
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+</script>
+{% endblock %}

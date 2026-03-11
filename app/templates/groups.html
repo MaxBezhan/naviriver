@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}Групи - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<style>
+.student-checkbox-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem;
+    background: var(--bg-color);
+}
+.student-checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.student-checkbox-item:hover {
+    background: var(--card-bg);
+}
+.student-checkbox-item:last-child {
+    border-bottom: none;
+}
+.student-checkbox-item input[type="checkbox"] {
+    margin-right: 0.75rem;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+.student-checkbox-item label {
+    cursor: pointer;
+    flex: 1;
+    margin: 0;
+}
+.school-filter-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.school-filter-tab {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: var(--card-bg);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.school-filter-tab:hover {
+    background: var(--primary-color);
+    color: white;
+}
+.school-filter-tab.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+</style>
+
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>👥 Групи слухачів</h1>
+        <button class="btn btn-success" onclick="openModal('add-group-modal')">
+            <span>➕</span> Створити групу
+        </button>
+    </div>
+
+    <!-- Список груп -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Список груп</h2>
+        </div>
+        
+        {% if groups %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва</th>
+                        <th>Опис</th>
+                        {% if current_user.role == 'system_admin' %}
+                        <th>Школа</th>
+                        {% endif %}
+                        <th>Викладач</th>
+                        <th>Слухачів</th>
+                        <th>Іспитів</th>
+                        <th>Статус</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr>
+                        <td><strong>{{ group.name }}</strong></td>
+                        <td>{{ group.description or '—' }}</td>
+                        {% if current_user.role == 'system_admin' %}
+                        <td>{{ group.school.name if group.school else '—' }}</td>
+                        {% endif %}
+                        <td>{{ group.teacher.get_full_name() or group.teacher.username }}</td>
+                        <td>{{ group.get_students_count() }}</td>
+                        <td>{{ group.exams|length }}</td>
+                        <td>
+                            {% if group.is_active %}
+                                <span class="badge badge-success">Активна</span>
+                            {% else %}
+                                <span class="badge badge-secondary">Неактивна</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{{ url_for('main.group_detail', group_id=group.id) }}" class="btn btn-primary btn-xs" title="Деталі">
+                                👁️
+                            </a>
+                            <button class="btn btn-info btn-xs" onclick="openEditGroupModal({{ group.id }}, '{{ group.name }}', '{{ group.description or '' }}', {{ group.teacher_id }}, {{ group.school_id if group.school_id else 'null' }})" title="Редагувати">
+                                ✏️
+                            </button>
+                            <form method="POST" action="{{ url_for('main.delete_group', group_id=group.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('ВИДАЛИТИ групу &quot;{{ group.name }}&quot;?')">
+                                <button type="submit" class="btn btn-danger btn-xs" title="Видалити">
+                                    🗑️
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <p>Ще немає груп</p>
+            <button class="btn btn-success" onclick="openModal('add-group-modal')">
+                <span>➕</span> Створити першу групу
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальне вікно: Додати групу -->
+<div class="modal-overlay" id="add-group-modal">
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3 class="modal-title">➕ Створити групу</h3>
+            <button class="modal-close" onclick="closeModal('add-group-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.add_group') }}" id="add-group-form">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Назва групи *</label>
+                    <input type="text" class="form-control" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Опис</label>
+                    <textarea class="form-control" name="description" rows="2"></textarea>
+                </div>
+                
+                {% if current_user.role == 'system_admin' %}
+                <!-- Вибір школи для системного адміністратора -->
+                <div class="form-group">
+                    <label class="form-label">Школа *</label>
+                    <select class="form-select" name="school_id" id="add-school-select" required onchange="filterStudentsBySchool()">
+                        <option value="">— Виберіть школу —</option>
+                        {% for school in schools %}
+                        <option value="{{ school.id }}">{{ school.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                {% if current_user.role in ['system_admin', 'school_admin'] %}
+                <div class="form-group">
+                    <label class="form-label">Викладач *</label>
+                    <select class="form-select" name="teacher_id" id="add-teacher-select" required>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}" {% if teacher.id == current_user.id %}selected{% endif %} data-school="{{ teacher.school_id }}">
+                            {{ teacher.get_full_name() or teacher.username }} ({{ teacher.get_role_display() }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <input type="hidden" name="teacher_id" value="{{ current_user.id }}">
+                {% endif %}
+                
+                <!-- Вибір слухачів з чекбоксами -->
+                <div class="form-group">
+                    <label class="form-label">Слухачі</label>
+                    
+                    {% if current_user.role == 'system_admin' %}
+                    <!-- Фільтри по школах для системного адміністратора -->
+                    <div class="school-filter-tabs" id="school-filter-tabs">
+                        <div class="school-filter-tab active" data-school="all" onclick="filterStudentsBySchoolTab('all')">Всі</div>
+                        {% for school in schools %}
+                        <div class="school-filter-tab" data-school="{{ school.id }}" onclick="filterStudentsBySchoolTab({{ school.id }})">{{ school.name }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="student-checkbox-list" id="student-checkbox-list">
+                        {% for student in students %}
+                        <div class="student-checkbox-item" data-school="{{ student.school_id if student.school_id else 'none' }}">
+                            <input type="checkbox" name="student_ids" value="{{ student.id }}" id="student_{{ student.id }}">
+                            <label for="student_{{ student.id }}">
+                                <strong>{{ student.get_full_name() or student.username }}</strong>
+                                {% if student.school %}<small style="color: var(--text-secondary);">({{ student.school.name }})</small>{% endif %}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <small style="color: var(--text-secondary);">Виберіть слухачів зі списку</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('add-group-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Створити</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Модальне вікно: Редагувати групу -->
+<div class="modal-overlay" id="edit-group-modal">
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ Редагувати групу</h3>
+            <button class="modal-close" onclick="closeModal('edit-group-modal')">&times;</button>
+        </div>
+        <form method="POST" id="edit-group-form" action="">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Назва групи *</label>
+                    <input type="text" class="form-control" name="name" id="edit-group-name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Опис</label>
+                    <textarea class="form-control" name="description" id="edit-group-description" rows="2"></textarea>
+                </div>
+                
+                {% if current_user.role == 'system_admin' %}
+                <div class="form-group">
+                    <label class="form-label">Школа *</label>
+                    <select class="form-select" name="school_id" id="edit-group-school" required>
+                        {% for school in schools %}
+                        <option value="{{ school.id }}">{{ school.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                {% if current_user.role in ['system_admin', 'school_admin'] %}
+                <div class="form-group">
+                    <label class="form-label">Викладач *</label>
+                    <select class="form-select" name="teacher_id" id="edit-group-teacher" required>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}">
+                            {{ teacher.get_full_name() or teacher.username }} ({{ teacher.get_role_display() }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('edit-group-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-primary">Зберегти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Відкриття модального вікна редагування
+function openEditGroupModal(id, name, description, teacherId, schoolId) {
+    document.getElementById('edit-group-form').action = '/groups/' + id + '/edit';
+    document.getElementById('edit-group-name').value = name;
+    document.getElementById('edit-group-description').value = description;
+    {% if current_user.role in ['system_admin', 'school_admin'] %}
+    document.getElementById('edit-group-teacher').value = teacherId;
+    {% endif %}
+    {% if current_user.role == 'system_admin' %}
+    if (schoolId) {
+        document.getElementById('edit-group-school').value = schoolId;
+    }
+    {% endif %}
+    openModal('edit-group-modal');
+}
+
+// Фільтрація слухачів по школі (для системного адміністратора)
+function filterStudentsBySchoolTab(schoolId) {
+    const tabs = document.querySelectorAll('.school-filter-tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    const items = document.querySelectorAll('.student-checkbox-item');
+    items.forEach(item => {
+        if (schoolId === 'all' || item.dataset.school == schoolId) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Фільтрація слухачів при виборі школи
+function filterStudentsBySchool() {
+    const schoolSelect = document.getElementById('add-school-select');
+    const selectedSchool = schoolSelect ? schoolSelect.value : null;
+    
+    if (!selectedSchool) return;
+    
+    // Фільтруємо слухачів
+    const items = document.querySelectorAll('.student-checkbox-item');
+    items.forEach(item => {
+        if (item.dataset.school === selectedSchool) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+            // Знімаємо чекбокс з прихованих слухачів
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            if (checkbox) checkbox.checked = false;
+        }
+    });
+    
+    // Оновлюємо фільтр-таби
+    const tabs = document.querySelectorAll('.school-filter-tab');
+    tabs.forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.school == selectedSchool) {
+            tab.classList.add('active');
+        }
+    });
+}
+
+// Валідація форми перед відправкою
+document.getElementById('add-group-form').addEventListener('submit', function(e) {
+    {% if current_user.role == 'system_admin' %}
+    const schoolSelect = document.getElementById('add-school-select');
+    if (!schoolSelect.value) {
+        e.preventDefault();
+        alert('Будь ласка, виберіть школу');
+        return false;
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

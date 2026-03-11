@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Результат іспиту - {{ exam.name }} - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>📊 Результат іспиту</h1>
+        <div>
+            {% if current_user.role == 'student' %}
+            <a href="{{ url_for('main.my_school_exams') }}" class="btn btn-outline">
+                <span>←</span> Назад до іспитів
+            </a>
+            {% else %}
+            <a href="{{ url_for('main.school_exams_results') }}" class="btn btn-outline">
+                <span>←</span> Назад до результатів
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Загальна інформація -->
+    <div class="card" style="margin-bottom: 1.5rem; {% if result.is_passed %}border-left: 4px solid var(--success-color);{% else %}border-left: 4px solid var(--danger-color);{% endif %}">
+        <div class="card-header">
+            <h2 class="card-title">{{ exam.name }}</h2>
+            <span class="badge badge-{{ 'success' if result.is_passed else 'danger' }}" style="font-size: 1rem;">
+                {{ '✓ Іспит складено' if result.is_passed else '✗ Іспит не складено' }}
+            </span>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                <div>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Слухач</p>
+                    <p style="font-size: 1.1rem; font-weight: 600;">
+                        {{ result.user.get_full_name() or result.user.username }}
+                    </p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Група</p>
+                    <p style="font-size: 1.1rem; font-weight: 600;">{{ exam.group.name }}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Категорія судна</p>
+                    <p style="font-size: 1.1rem; font-weight: 600;">{{ exam.category.name }}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Дата проходження</p>
+                    <p style="font-size: 1.1rem; font-weight: 600;">
+                        {{ result.completed_at.strftime('%d.%m.%Y %H:%M') }}
+                    </p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Час проходження</p>
+                    <p style="font-size: 1.1rem; font-weight: 600;">{{ result.get_time_spent_formatted() }}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Результат</p>
+                    <p style="font-size: 1.1rem; font-weight: 600;">
+                        {{ result.correct_answers }} правильно / {{ result.errors_count }} помилок
+                        <br><small style="color: var(--text-secondary);">(допустимо: {{ exam.max_errors }})</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Детальні відповіді -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">📝 Деталі відповідей</h2>
+        </div>
+        
+        {% if answers %}
+        <div style="padding: 1rem;">
+            {% for answer in answers %}
+            <div style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color); {% if not loop.last %}margin-bottom: 2rem;{% else %}border-bottom: none;{% endif %}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Питання {{ loop.index }}</h3>
+                    <span class="badge badge-{{ 'success' if answer.is_correct else 'danger' }}">
+                        {{ '✓ Правильно' if answer.is_correct else '✗ Неправильно' }}
+                    </span>
+                </div>
+                
+                <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1rem;">
+                    {{ answer.question.text }}
+                </p>
+                
+                {% if answer.question.image %}
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <img src="data:image/jpeg;base64,{{ answer.question.image }}" 
+                         alt="Зображення до питання" 
+                         style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+                </div>
+                {% endif %}
+                
+                <div style="background: var(--bg-color); padding: 1rem; border-radius: 8px;">
+                    <p style="margin-bottom: 0.5rem;"><strong>Варіанти відповідей:</strong></p>
+                    {% set options = [answer.question.option1, answer.question.option2, answer.question.option3] %}
+                    {% for i in range(3) %}
+                    <div style="padding: 0.5rem; margin-bottom: 0.25rem; border-radius: 4px;
+                        {% if i == answer.question.correct %}background: rgba(40, 167, 69, 0.2); border: 1px solid var(--success-color);{% endif %}
+                        {% if i == answer.selected_answer and not answer.is_correct %}background: rgba(220, 53, 69, 0.2); border: 1px solid var(--danger-color);{% endif %}">
+                        <span style="font-weight: 600;">{{ ['A', 'B', 'C'][i] }}.</span> {{ options[i] }}
+                        {% if i == answer.question.correct %}<span style="color: var(--success-color); margin-left: 0.5rem;">✓ Правильна відповідь</span>{% endif %}
+                        {% if i == answer.selected_answer and not answer.is_correct %}<span style="color: var(--danger-color); margin-left: 0.5rem;">✗ Ваш вибір</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <p>Немає даних про відповіді</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

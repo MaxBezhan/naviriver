@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Завершення тесту - АЛЛІН Тренажер{% endblock %}
+
+{% block content %}
+<div class="test-container fade-in">
+    <div class="card" style="text-align: center; padding: 2rem;">
+        <h1 style="margin-bottom: 1rem;">📝 Огляд відповідей</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+            Перевірте свої відповіді перед завершенням тесту
+        </p>
+
+        {% set answered_count = answers | length %}
+        {% set total_count = questions | length %}
+        
+        <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap;">
+            <div class="result-item">
+                <div class="result-value success">{{ answered_count }}</div>
+                <div style="color: var(--text-secondary);">Відповідей</div>
+            </div>
+            <div class="result-item">
+                <div class="result-value danger">{{ total_count - answered_count }}</div>
+                <div style="color: var(--text-secondary);">Пропущено</div>
+            </div>
+            <div class="result-item">
+                <div class="result-value">{{ total_count }}</div>
+                <div style="color: var(--text-secondary);">Всього</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Карта питань зі статусами -->
+    <div class="card">
+        <h3 style="margin-bottom: 1rem;">🗺️ Статус питань</h3>
+        <div class="question-map" style="justify-content: center;">
+            {% for question in questions %}
+            {% set qid = question.id | string %}
+            {% set is_answered = qid in answers %}
+            <div class="question-map-item {% if is_answered %}answered{% endif %}" 
+                 title="{{ question.text[:50] }}...">
+                {{ loop.index }}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="question-map-item" style="width: 24px; height: 24px; font-size: 0.75rem;"></span>
+                Не відповідено
+            </span>
+            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="question-map-item answered" style="width: 24px; height: 24px; font-size: 0.75rem;"></span>
+                Відповідено
+            </span>
+        </div>
+    </div>
+
+    <!-- Дії -->
+    <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; flex-wrap: wrap;">
+        <a href="{{ url_for('main.test_question') }}" class="btn btn-outline btn-lg">
+            <span>↩️</span> Повернутися до тесту
+        </a>
+        
+        <form method="POST" action="{{ url_for('main.test_finish') }}" style="display: inline;">
+            <button type="submit" class="btn btn-success btn-lg" 
+                    onclick="return confirm('Завершити тест та переглянути результати?')">
+                <span>✅</span> Завершити тест
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

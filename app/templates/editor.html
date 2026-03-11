@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Редактор питань - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <h1>✏️ Редактор питань</h1>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('main.add_question') }}" class="btn btn-success btn-sm">
+                <span>➕</span> Додати
+            </a>
+            <a href="{{ url_for('main.import_questions') }}" class="btn btn-primary btn-sm">
+                <span>📥</span> Імпорт
+            </a>
+            <div class="btn-group">
+                <button class="btn btn-outline btn-sm" onclick="exportData('json')">
+                    <span>📤</span> JSON
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="exportData('csv')">
+                    <span>📤</span> CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Фільтри -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <form method="GET" action="{{ url_for('main.editor') }}" class="filters">
+            <div class="filter-group">
+                <label>Розділ:</label>
+                <select class="form-select" name="section" onchange="this.form.submit()">
+                    <option value="">Всі розділи</option>
+                    {% for section in sections %}
+                    <option value="{{ section }}" {% if section_filter == section %}selected{% endif %}>
+                        Розділ {{ section }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Категорія:</label>
+                <select class="form-select" name="category" onchange="this.form.submit()">
+                    <option value="">Всі категорії</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.code }}" {% if category_filter == cat.code %}selected{% endif %}>
+                        {{ cat.name }} ({{ cat.code }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <a href="{{ url_for('main.editor') }}" class="btn btn-outline btn-sm">Скинути</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Таблиця питань -->
+    <div class="card">
+        {% if questions.items %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Розділ</th>
+                        <th>Питання</th>
+                        <th>Варіанти</th>
+                        <th style="text-align: center;">Прав.</th>
+                        <th style="text-align: center;">МС</th>
+                        <th style="text-align: center;">ГЦ</th>
+                        <th style="text-align: center;">📷</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for question in questions.items %}
+                    {% set cat_codes = question.categories | map(attribute='code') | list %}
+                    <tr>
+                        <td>{{ question.id }}</td>
+                        <td>{{ question.section }}</td>
+                        <td>{{ question.text[:60] }}{% if question.text|length > 60 %}...{% endif %}</td>
+                        <td>
+                            <small style="color: var(--text-secondary);">
+                                1) {{ question.option1[:25] }}{% if question.option1|length > 25 %}...{% endif %}
+                            </small>
+                        </td>
+                        <td style="text-align: center; font-weight: 600;">{{ question.correct + 1 }}</td>
+                        <td style="text-align: center;">
+                            {% if 'MS' in cat_codes %}
+                            <span style="color: var(--success-color); font-weight: bold;">✓</span>
+                            {% else %}
+                            <span style="color: var(--border-color);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            {% if 'GC' in cat_codes %}
+                            <span style="color: var(--success-color); font-weight: bold;">✓</span>
+                            {% else %}
+                            <span style="color: var(--border-color);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            {% if question.image_base64 %}
+                            <span style="color: var(--success-color);">✓</span>
+                            {% else %}
+                            <span style="color: var(--border-color);">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{{ url_for('main.edit_question', question_id=question.id) }}" 
+                               class="btn btn-primary btn-xs" title="Редагувати">
+                                ✏️
+                            </a>
+                            <form method="POST" action="{{ url_for('main.delete_question', question_id=question.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirmDelete('Видалити це питання?')">
+                                <button type="submit" class="btn btn-danger btn-xs" title="Видалити">
+                                    🗑️
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Пагінація -->
+        {% if questions.pages > 1 %}
+        <div class="pagination">
+            {% if questions.has_prev %}
+            <a href="{{ url_for('main.editor', page=questions.prev_num, section=section_filter, category=category_filter) }}" class="page-link">←</a>
+            {% endif %}
+            
+            {% for page_num in questions.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                {% if page_num %}
+                    {% if page_num == questions.page %}
+                    <span class="page-link active">{{ page_num }}</span>
+                    {% else %}
+                    <a href="{{ url_for('main.editor', page=page_num, section=section_filter, category=category_filter) }}" class="page-link">{{ page_num }}</a>
+                    {% endif %}
+                {% else %}
+                    <span class="page-link" style="border: none;">...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if questions.has_next %}
+            <a href="{{ url_for('main.editor', page=questions.next_num, section=section_filter, category=category_filter) }}" class="page-link">→</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">
+            Показано {{ questions.items|length }} з {{ questions.total }} питань
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <p>Немає питань для відображення</p>
+            <a href="{{ url_for('main.add_question') }}" class="btn btn-primary" style="margin-top: 1rem;">
+                Додати перше питання
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function confirmDelete(message) {
+    return confirm(message);
+}
+
+function exportData(format) {
+    window.location.href = `/export/${format}`;
+}
+</script>
+{% endblock %}
