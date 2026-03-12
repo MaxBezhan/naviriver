@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Іспит - {{ exam.name }} - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<style>
+.exam-timer {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: var(--card-bg);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+    text-align: center;
+    border: 2px solid var(--primary-color);
+}
+.exam-timer.warning {
+    border-color: var(--warning-color);
+    animation: pulse 1s infinite;
+}
+.exam-timer.danger {
+    border-color: var(--danger-color);
+    animation: pulse 0.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+.option-item.selected {
+    background: var(--primary-color) !important;
+    color: white !important;
+    border-color: var(--primary-color) !important;
+}
+</style>
+
+<!-- Таймер -->
+<div class="exam-timer" id="exam-timer">
+    <div style="font-size: 0.8rem; color: var(--text-secondary);">Залишилось часу</div>
+    <div style="font-size: 2rem; font-weight: 700;" id="timer-display">--:--</div>
+</div>
+
+<div class="fade-in">
+    <!-- Прогрес -->
+    <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span>Питання <strong>{{ current_question }}</strong> з <strong>{{ total_questions }}</strong></span>
+            <span>{{ (current_question / total_questions * 100)|int }}%</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ (current_question / total_questions * 100) }}%;"></div>
+        </div>
+    </div>
+
+    <!-- Питання -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">Питання {{ current_question }}</h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 1.2rem; line-height: 1.6; margin-bottom: 1.5rem;">
+                {{ question.text }}
+            </p>
+            
+            {% if question.image %}
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <img src="data:image/jpeg;base64,{{ question.image }}" 
+                     alt="Зображення до питання" 
+                     style="max-width: 100%; max-height: 400px; border-radius: 8px;">
+            </div>
+            {% endif %}
+            
+            <div class="options-list" id="options-list">
+                {% set options = question.get_shuffled_options() %}
+                {% for option in options %}
+                <div class="option-item {% if existing_answer and existing_answer.selected_answer == option.original_index %}selected{% endif %}"
+                     data-question-id="{{ question.id }}"
+                     data-option-index="{{ option.original_index }}"
+                     onclick="selectOption(this)">
+                    <span class="option-key">{{ option.key }}</span>
+                    <span class="option-text">{{ option.text }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Навігація -->
+    <div style="display: flex; justify-content: space-between;">
+        <a href="{{ url_for('main.finish_school_exam') }}" 
+           class="btn btn-outline"
+           onclick="return confirm('Завершити іспит? Незбережені відповіді будуть втрачені.')">
+            ⛔ Завершити іспит
+        </a>
+        <button class="btn btn-primary" id="next-btn" onclick="goToNext()" disabled>
+            Далі →
+        </button>
+    </div>
+</div>
+
+<script>
+let selectedAnswer = {% if existing_answer %}{{ existing_answer.selected_answer }}{% else %}null{% endif %};
+let questionId = {{ question.id }};
+let remainingSeconds = {{ remaining_seconds }};
+let timerInterval;
+
+// Таймер
+function updateTimer() {
+    const timerDisplay = document.getElementById('timer-display');
+    const timerContainer = document.getElementById('exam-timer');
+    
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    
+    // Зміна кольору при малому часі
+    if (remainingSeconds <= 60) {
+        timerContainer.classList.add('danger');
+        timerContainer.classList.remove('warning');
+    } else if (remainingSeconds <= 300) {
+        timerContainer.classList.add('warning');
+    }
+    
+    if (remainingSeconds <= 0) {
+        clearInterval(timerInterval);
+        alert('Час вийшов! Іспит буде завершено автоматично.');
+        window.location.href = '{{ url_for('main.finish_school_exam') }}';
+    }
+    
+    remainingSeconds--;
+}
+
+timerInterval = setInterval(updateTimer, 1000);
+updateTimer();
+
+// Вибір відповіді
+function selectOption(element) {
+    // Знімаємо виділення з усіх опцій
+    document.querySelectorAll('.option-item').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    
+    // Виділяємо обрану
+    element.classList.add('selected');
+    selectedAnswer = parseInt(element.dataset.optionIndex);
+    
+    // Активуємо кнопку "Далі"
+    document.getElementById('next-btn').disabled = false;
+    
+    // Відправляємо відповідь на сервер
+    saveAnswer();
+}
+
+// Збереження відповіді
+function saveAnswer() {
+    fetch('{{ url_for('main.school_exam_answer') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            question_id: questionId,
+            selected_answer: selectedAnswer
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Помилка збереження відповіді');
+        }
+    })
+    .catch(error => {
+        console.error('Помилка:', error);
+    });
+}
+
+// Перехід до наступного питання
+function goToNext() {
+    if (selectedAnswer === null) {
+        alert('Виберіть відповідь');
+        return;
+    }
+    
+    window.location.href = '{{ url_for('main.school_exam_next') }}';
+}
+
+// Попередження при спробі закрити сторінку
+window.addEventListener('beforeunload', function(e) {
+    e.preventDefault();
+    e.returnValue = '';
+});
+</script>
+{% endblock %}

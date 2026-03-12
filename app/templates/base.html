@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Тренажер для судноводіїв{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+    <style>
+        /* Фонове зображення морської тематики */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at top, rgba(219, 234, 254, 0.3) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom, rgba(224, 242, 254, 0.3) 0%, transparent 50%),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23dbeafe' fill-opacity='0.2' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+            background-size: cover, cover, 100% auto;
+            background-position: center, center, bottom;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            z-index: -1;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav class="navbar">
+        <div class="navbar-content">
+            <a href="{{ url_for('main.dashboard') }}" class="navbar-brand">
+                <span style="font-size: 1.5rem;">⚓</span>
+                <span>Тренажер для судноводіїв</span>
+            </a>
+            <ul class="navbar-nav">
+                <li><a href="{{ url_for('main.dashboard') }}" class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">🌊 Головна</a></li>
+                <li><a href="{{ url_for('main.statistics') }}" class="nav-link {% if request.endpoint == 'main.statistics' %}active{% endif %}">📊 Статистика</a></li>
+                {% if current_user.can_edit_questions() %}
+                <li><a href="{{ url_for('main.editor') }}" class="nav-link {% if request.endpoint.startswith('main.editor') or request.endpoint in ['main.add_question', 'main.edit_question'] %}active{% endif %}">✏️ Редактор</a></li>
+                {% endif %}
+                {% if current_user.role in ['teacher', 'school_admin', 'system_admin'] %}
+                <li><a href="{{ url_for('main.groups_list') }}" class="nav-link {% if request.endpoint.startswith('main.group') or request.endpoint.startswith('main.school_exam') %}active{% endif %}">👥 Групи</a></li>
+                {% endif %}
+                {% if current_user.role == 'student' %}
+                <li><a href="{{ url_for('main.my_school_exams') }}" class="nav-link {% if request.endpoint.startswith('main.school_exam') %}active{% endif %}">📝 Мої іспити</a></li>
+                {% endif %}
+                {% if current_user.can_access_admin() %}
+                <li><a href="{{ url_for('main.admin') }}" class="nav-link {% if request.endpoint == 'main.admin' %}active{% endif %}">⚙️ Адмін</a></li>
+                {% endif %}
+                <li><a href="{{ url_for('main.profile') }}" class="nav-link {% if request.endpoint == 'main.profile' %}active{% endif %}">👤 Профіль</a></li>
+                <li>
+                    <div class="font-size-controls">
+                        <button class="font-size-btn" onclick="setFontSize('xs')" title="Дуже маленький">A-</button>
+                        <button class="font-size-btn" onclick="setFontSize('small')" title="Маленький">A</button>
+                        <button class="font-size-btn active" onclick="setFontSize('normal')" title="Нормальний">A+</button>
+                        <button class="font-size-btn" onclick="setFontSize('large')" title="Великий">A++</button>
+                        <button class="font-size-btn" onclick="setFontSize('xlarge')" title="Дуже великий">A+++</button>
+                    </div>
+                </li>
+                <li><a href="{{ url_for('main.logout') }}" class="nav-link">🚪 Вийти</a></li>
+            </ul>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="{% if not current_user.is_authenticated %}login-page{% else %}container{% endif %}">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} fade-in">
+                        <span>
+                            {% if category == 'success' %}✅{% endif %}
+                            {% if category == 'danger' %}❌{% endif %}
+                            {% if category == 'warning' %}⚠️{% endif %}
+                            {% if category == 'info' %}ℹ️{% endif %}
+                        </span>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Керування розміром шрифту - 5 рівнів
+        const fontSizeLabels = {
+            'xs': 'A-',
+            'small': 'A',
+            'normal': 'A+',
+            'large': 'A++',
+            'xlarge': 'A+++'
+        };
+        
+        function setFontSize(size) {
+            // Видаляємо всі класи розміру шрифту
+            document.body.classList.remove('font-size-xs', 'font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge', 'font-size-xxlarge');
+            
+            // Додаємо потрібний клас
+            if (size && size !== 'normal') {
+                document.body.classList.add('font-size-' + size);
+            }
+            
+            // Зберігаємо вибір
+            localStorage.setItem('fontSize', size);
+            
+            // Оновлюємо активну кнопку
+            document.querySelectorAll('.font-size-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === fontSizeLabels[size]) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        // Відновлюємо розмір шрифту при завантаженні
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedSize = localStorage.getItem('fontSize') || 'normal';
+            setFontSize(savedSize);
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

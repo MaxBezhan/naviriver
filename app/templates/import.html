@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Імпорт питань - АЛЛІН Тренажер{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>📥 Імпорт питань</h1>
+        <a href="{{ url_for('main.editor') }}" class="btn btn-outline">
+            <span>←</span> Назад до редактора
+        </a>
+    </div>
+
+    <!-- Статистика бази -->
+    <div class="dashboard-grid" style="margin-bottom: 2rem;">
+        <div class="stat-card">
+            <div class="stat-icon blue">📚</div>
+            <div>
+                <div class="stat-value">{{ stats.total }}</div>
+                <div class="stat-label">Всього питань</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green">📂</div>
+            <div>
+                <div class="stat-value">{{ stats.sections }}</div>
+                <div class="stat-label">Розділів</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">🖼️</div>
+            <div>
+                <div class="stat-value">{{ stats.with_images }}</div>
+                <div class="stat-label">З фото</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+        <!-- Імпорт з JSON -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📄 Імпорт з JSON</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Завантажте файл у форматі JSON з масивом об'єктів питань.
+            </p>
+            <form method="POST" action="{{ url_for('main.import_questions') }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label class="form-label">Файл JSON</label>
+                    <input type="file" class="form-control" name="file" accept=".json" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <span>📤</span> Імпортувати JSON
+                </button>
+            </form>
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: var(--light-bg); border-radius: var(--radius);">
+                <p style="font-weight: 600; margin-bottom: 0.5rem;">Формат JSON:</p>
+                <pre style="font-size: 0.75rem; overflow-x: auto;"><code>[{
+  "section": "1",
+  "text": "Текст питання",
+  "options": ["Варіант А", "Варіант Б", "Варіант В"],
+  "correct": 0,
+  "image": null
+}]</code></pre>
+            </div>
+        </div>
+
+        <!-- Імпорт з CSV -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📊 Імпорт з CSV</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Завантажте файл у форматі CSV з роздільником.
+            </p>
+            <form method="POST" action="{{ url_for('main.import_questions') }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label class="form-label">Файл CSV</label>
+                    <input type="file" class="form-control" name="file" accept=".csv,.txt" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Роздільник</label>
+                    <select class="form-select" name="delimiter">
+                        <option value=";">Крапка з комою (;)</option>
+                        <option value=",">Кома (,)</option>
+                        <option value="\t">Табуляція</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <span>📤</span> Імпортувати CSV
+                </button>
+            </form>
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: var(--light-bg); border-radius: var(--radius);">
+                <p style="font-weight: 600; margin-bottom: 0.5rem;">Формат CSV:</p>
+                <pre style="font-size: 0.75rem; overflow-x: auto;"><code>section;question;option1;option2;option3;correct
+1;Текст питання;Варіант А;Варіант Б;Варіант В;0</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Розподіл по розділах -->
+    {% if stats.section_breakdown %}
+    <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📂 Розподіл по розділах</h2>
+        </div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Розділ</th>
+                        <th>Кількість питань</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for section, count in stats.section_breakdown.items() %}
+                    <tr>
+                        <td>Розділ {{ section }}</td>
+                        <td>{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

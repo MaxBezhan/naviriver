@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+        <h1 style="margin: 0;">📊 Статистика</h1>
+        <form method="POST" action="{{ url_for('main.reset_my_stats') }}" onsubmit="return confirm('Ви впевнені, що хочете скинути всю свою статистику? Цю дію не можна скасувати.');">
+            <button type="submit" class="btn btn-danger btn-sm">
+                <span>🗑️</span> Скинути статистику
+            </button>
+        </form>
+    </div>
+
+    <!-- Загальна статистика -->
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">📝</div>
+            <div>
+                <div class="stat-value">{{ user_stats.total_tests }}</div>
+                <div class="stat-label">Всього тестів</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green">🎯</div>
+            <div>
+                <div class="stat-value">{{ user_stats.average_score }}%</div>
+                <div class="stat-label">Середній результат</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red">❌</div>
+            <div>
+                <div class="stat-value">{{ user_stats.mistakes_count }}</div>
+                <div class="stat-label">Питань з помилками</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+        <!-- Історія тестів -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📜 Історія тестів</h2>
+            </div>
+            
+            {% if test_sessions %}
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Режим</th>
+                            <th>Результат</th>
+                            <th>Час</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in test_sessions %}
+                        <tr>
+                            <td>{{ session.completed_at.strftime('%d.%m.%Y %H:%M') if session.completed_at else '—' }}</td>
+                            <td>
+                                {% if session.mode == 'sections' %}📑 По розділах
+                                {% elif session.mode == 'random' %}🎲 Випадкові
+                                {% elif session.mode == 'exam' %}📝 Іспит
+                                {% elif session.mode == 'mistakes' %}❌ Помилки
+                                {% elif session.mode == 'study' %}📖 Навчання
+                                {% else %}{{ session.mode }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if session.get_score_percent() >= 70 %}badge-success{% else %}badge-danger{% endif %}">
+                                    {{ session.get_score_percent() }}%
+                                </span>
+                            </td>
+                            <td>{{ session.get_duration_formatted() }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <p>Ще немає завершених тестів</p>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary" style="margin-top: 1rem;">
+                    Почати тестування
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Статистика по розділах -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📚 Розподіл питань по розділах</h2>
+            </div>
+            
+            {% if section_stats %}
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Розділ</th>
+                            <th>Кількість питань</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for section, count in section_stats %}
+                        <tr>
+                            <td>Розділ {{ section }}</td>
+                            <td>{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <p>Немає даних про розділи</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Графік прогресу (буде реалізовано через Chart.js) -->
+    <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📈 Динаміка результатів</h2>
+        </div>
+        <div id="progress-chart" style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">
+            <p>Графік буде доступний після проходження більше 5 тестів</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

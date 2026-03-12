@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Групи - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>👥 Групи слухачів</h1>
+        <button class="btn btn-success" onclick="openModal('add-group-modal')">
+            <span>➕</span> Створити групу
+        </button>
+    </div>
+
+    <!-- Список груп -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Список груп</h2>
+        </div>
+        
+        {% if groups %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва</th>
+                        <th>Опис</th>
+                        <th>Викладач</th>
+                        <th>Слухачів</th>
+                        <th>Іспитів</th>
+                        <th>Статус</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr>
+                        <td><strong>{{ group.name }}</strong></td>
+                        <td>{{ group.description or '—' }}</td>
+                        <td>{{ group.teacher.get_full_name() or group.teacher.username }}</td>
+                        <td>{{ group.get_students_count() }}</td>
+                        <td>{{ group.exams|length }}</td>
+                        <td>
+                            {% if group.is_active %}
+                                <span class="badge badge-success">Активна</span>
+                            {% else %}
+                                <span class="badge badge-secondary">Неактивна</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{{ url_for('main.group_detail', group_id=group.id) }}" class="btn btn-primary btn-xs" title="Деталі">
+                                👁️
+                            </a>
+                            <button class="btn btn-info btn-xs" onclick="editGroup({{ group.id }}, '{{ group.name }}', '{{ group.description or '' }}', {{ group.teacher_id }})" title="Редагувати">
+                                ✏️
+                            </button>
+                            <form method="POST" action="{{ url_for('main.delete_group', group_id=group.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('ВИДАЛИТИ групу &quot;{{ group.name }}&quot;?')">
+                                <button type="submit" class="btn btn-danger btn-xs" title="Видалити">
+                                    🗑️
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <p>Ще немає груп</p>
+            <button class="btn btn-success" onclick="openModal('add-group-modal')">
+                <span>➕</span> Створити першу групу
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальне вікно: Додати групу -->
+<div class="modal-overlay" id="add-group-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">➕ Створити групу</h3>
+            <button class="modal-close" onclick="closeModal('add-group-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.add_group') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Назва групи *</label>
+                    <input type="text" class="form-control" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Опис</label>
+                    <textarea class="form-control" name="description" rows="3"></textarea>
+                </div>
+                {% if current_user.role in ['system_admin', 'school_admin'] %}
+                <div class="form-group">
+                    <label class="form-label">Викладач *</label>
+                    <select class="form-select" name="teacher_id" required>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}" {% if teacher.id == current_user.id %}selected{% endif %}>
+                            {{ teacher.get_full_name() or teacher.username }} ({{ teacher.get_role_display() }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <input type="hidden" name="teacher_id" value="{{ current_user.id }}">
+                {% endif %}
+                <div class="form-group">
+                    <label class="form-label">Слухачі</label>
+                    <select class="form-select" name="student_ids" multiple size="8" style="height: auto;">
+                        {% for student in students %}
+                        <option value="{{ student.id }}">
+                            {{ student.get_full_name() or student.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small style="color: var(--text-secondary);">Утримуйте Ctrl для вибору декількох слухачів</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('add-group-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Створити</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Модальне вікно: Редагувати групу -->
+<div class="modal-overlay" id="edit-group-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ Редагувати групу</h3>
+            <button class="modal-close" onclick="closeModal('edit-group-modal')">&times;</button>
+        </div>
+        <form method="POST" id="edit-group-form" action="">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Назва групи *</label>
+                    <input type="text" class="form-control" name="name" id="edit-group-name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Опис</label>
+                    <textarea class="form-control" name="description" id="edit-group-description" rows="3"></textarea>
+                </div>
+                {% if current_user.role in ['system_admin', 'school_admin'] %}
+                <div class="form-group">
+                    <label class="form-label">Викладач *</label>
+                    <select class="form-select" name="teacher_id" id="edit-group-teacher" required>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}">
+                            {{ teacher.get_full_name() or teacher.username }} ({{ teacher.get_role_display() }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('edit-group-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-primary">Зберегти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editGroup(id, name, description, teacherId) {
+    document.getElementById('edit-group-form').action = '/groups/' + id + '/edit';
+    document.getElementById('edit-group-name').value = name;
+    document.getElementById('edit-group-description').value = description;
+    {% if current_user.role in ['system_admin', 'school_admin'] %}
+    document.getElementById('edit-group-teacher').value = teacherId;
+    {% endif %}
+    openModal('edit-group-modal');
+}
+</script>
+{% endblock %}

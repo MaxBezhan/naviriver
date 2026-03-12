@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }} - Група - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <div>
+            <h1>👥 {{ group.name }}</h1>
+            <p style="color: var(--text-secondary);">
+                Викладач: <strong>{{ group.teacher.get_full_name() or group.teacher.username }}</strong> | 
+                Слухачів: <strong>{{ group.get_students_count() }}</strong> |
+                Іспитів: <strong>{{ group.exams|length }}</strong>
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('main.groups_list') }}" class="btn btn-outline">
+                <span>←</span> Назад
+            </a>
+            <button class="btn btn-success" onclick="openModal('add-exam-modal')">
+                <span>📝</span> Створити іспит
+            </button>
+        </div>
+    </div>
+
+    <!-- Опис групи -->
+    {% if group.description %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="padding: 1rem;">
+            <p>{{ group.description }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Слухачі групи -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">👨‍🎓 Слухачі групи ({{ group.get_students_count() }})</h2>
+            <button class="btn btn-success btn-sm" onclick="openModal('add-student-modal')">
+                <span>➕</span> Додати слухача
+            </button>
+        </div>
+        
+        {% if group.students %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ПІБ</th>
+                        <th>Ім'я користувача</th>
+                        <th>Телефон</th>
+                        <th>Email</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in group.students %}
+                    <tr>
+                        <td>{{ student.get_full_name() or '—' }}</td>
+                        <td>{{ student.username }}</td>
+                        <td>{{ student.phone or '—' }}</td>
+                        <td>{{ student.email or '—' }}</td>
+                        <td class="actions">
+                            <form method="POST" 
+                                  action="{{ url_for('main.remove_student_from_group', group_id=group.id, student_id=student.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('Видалити слухача &quot;{{ student.get_full_name() or student.username }}&quot; з групи?')">
+                                <button type="submit" class="btn btn-danger btn-xs" title="Видалити з групи">
+                                    🗑️
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">👨‍🎓</div>
+            <p>У групі ще немає слухачів</p>
+            <button class="btn btn-success" onclick="openModal('add-student-modal')">
+                <span>➕</span> Додати слухача
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Іспити групи -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">📝 Шкільні іспити ({{ group.exams|length }})</h2>
+        </div>
+        
+        {% if group.exams %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Назва</th>
+                        <th>Категорія</th>
+                        <th>Питань</th>
+                        <th>Час</th>
+                        <th>Доп. помилок</th>
+                        <th>Статус</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exam in group.exams %}
+                    <tr>
+                        <td><strong>{{ exam.name }}</strong></td>
+                        <td>{{ exam.category.name }}</td>
+                        <td>{{ exam.question_count }}</td>
+                        <td>{{ exam.time_minutes }} хв</td>
+                        <td>{{ exam.max_errors }}</td>
+                        <td>
+                            {% if exam.is_active %}
+                                <span class="badge badge-success">Активний</span>
+                                {% if exam.activated_at %}
+                                    <br><small>{{ exam.activated_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge badge-secondary">Неактивний</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <form method="POST" action="{{ url_for('main.toggle_school_exam', exam_id=exam.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-{{ 'danger' if exam.is_active else 'success' }} btn-xs" 
+                                        title="{{ 'Деактивувати' if exam.is_active else 'Активувати' }}">
+                                    {{ '🚫' if exam.is_active else '✓' }}
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('main.delete_school_exam', exam_id=exam.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('ВИДАЛИТИ іспит &quot;{{ exam.name }}&quot;?')">
+                                <button type="submit" class="btn btn-danger btn-xs" title="Видалити">
+                                    🗑️
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <p>У групи ще немає іспитів</p>
+            <button class="btn btn-success" onclick="openModal('add-exam-modal')">
+                <span>➕</span> Створити перший іспит
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальне вікно: Додати слухача -->
+<div class="modal-overlay" id="add-student-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">➕ Додати слухача до групи</h3>
+            <button class="modal-close" onclick="closeModal('add-student-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.add_student_to_group', group_id=group.id) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Виберіть слухача *</label>
+                    <select class="form-select" name="student_id" required>
+                        <option value="">— Виберіть слухача —</option>
+                        {% for student in students %}
+                            {% if student not in group.students %}
+                            <option value="{{ student.id }}">
+                                {{ student.get_full_name() or student.username }}
+                                {% if student.phone %} ({{ student.phone }}){% endif %}
+                            </option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('add-student-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Додати</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Модальне вікно: Створити іспит -->
+<div class="modal-overlay" id="add-exam-modal">
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3 class="modal-title">📝 Створити шкільний іспит</h3>
+            <button class="modal-close" onclick="closeModal('add-exam-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('main.add_school_exam', group_id=group.id) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Назва іспиту *</label>
+                    <input type="text" class="form-control" name="name" placeholder="Наприклад: Іспит з МС - Група 1" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Категорія суден *</label>
+                    <select class="form-select" name="category_id" required>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Кількість питань</label>
+                        <input type="number" class="form-control" name="question_count" value="10" min="1" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Час (хвилин)</label>
+                        <input type="number" class="form-control" name="time_minutes" value="20" min="1" max="180">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Допустимо помилок</label>
+                        <input type="number" class="form-control" name="max_errors" value="2" min="0" max="10">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Тип вибору питань</label>
+                    <select class="form-select" name="question_selection_type" id="question-selection-type" onchange="toggleQuestionSelection()">
+                        <option value="random">Випадково з бази</option>
+                        <option value="manual">Вручну вибрати питання</option>
+                    </select>
+                </div>
+                
+                <div id="manual-questions" class="form-group" style="display: none;">
+                    <label class="form-label">Виберіть питання (утримуйте Ctrl для вибору декількох)</label>
+                    <select class="form-select" name="question_ids" multiple size="10" style="height: auto;">
+                        {% for question in questions %}
+                        <option value="{{ question.id }}">
+                            {{ question.id }}. {{ question.text[:80] }}{% if question.text|length > 80 %}...{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('add-exam-modal')">Скасувати</button>
+                <button type="submit" class="btn btn-success">Створити іспит</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleQuestionSelection() {
+    const selectType = document.getElementById('question-selection-type').value;
+    const manualQuestions = document.getElementById('manual-questions');
+    
+    if (selectType === 'manual') {
+        manualQuestions.style.display = 'block';
+    } else {
+        manualQuestions.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

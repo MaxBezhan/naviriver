@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Навчання - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="test-container" id="test-container">
+    <!-- Заголовок -->
+    <div class="test-header">
+        <div class="test-progress">
+            <span>Питання <strong>{{ current_index }}</strong> з <strong>{{ total }}</strong></span>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ (current_index / total * 100) }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Питання -->
+    <div class="question-card">
+        <div class="question-number">Розділ {{ question.section }}</div>
+        <div class="question-text">{{ question.text }}</div>
+        
+        {% if question.image_base64 %}
+        <img src="{{ question.image_base64 }}" alt="Зображення до питання" class="question-image">
+        {% endif %}
+
+        <!-- Правильна відповідь -->
+        <div class="card" style="background: #dcfce7; border: 2px solid #22c55e; margin-top: 1.5rem;">
+            <div style="font-weight: 600; color: #166534; margin-bottom: 0.5rem;">✓ Правильна відповідь:</div>
+            <div style="color: #166534; font-size: var(--font-size-lg);">
+                {{ question.get_options()[question.correct] }}
+            </div>
+        </div>
+
+        <!-- Навігація під питанням -->
+        <div class="test-navigation" style="margin-top: 1.5rem;">
+            <a href="{{ url_for('main.test_prev') }}" class="btn btn-outline btn-sm" id="btn-prev" 
+               {% if current_index == 1 %}style="visibility: hidden;"{% endif %}>
+                <span>←</span> Попереднє
+            </a>
+            
+            {% if current_index < total %}
+            <a href="{{ url_for('main.test_next') }}" class="btn btn-primary btn-sm" id="btn-next">
+                Наступне <span>→</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-success btn-sm">
+                <span>✓</span> Завершити навчання
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Карта питань (згортається) -->
+    <div class="question-map-container">
+        <div class="question-map-header" onclick="toggleQuestionMap()">
+            <span style="font-weight: 600; font-size: var(--font-size-sm);">🗺️ Карта питань</span>
+            <button type="button" class="question-map-toggle" id="map-toggle-btn">
+                <span id="map-toggle-icon">▼</span> <span id="map-toggle-text">Приховати</span>
+            </button>
+        </div>
+        <div class="question-map" id="question-map">
+            {% for i in range(1, total + 1) %}
+            <a href="{{ url_for('main.test_go_to', index=i-1) }}" 
+               class="question-map-item {% if i == current_index %}current{% endif %} {% if i <= current_index %}passed{% endif %}" 
+               title="Перейти до питання {{ i }}">
+                {{ i }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Експорт -->
+    <div class="card" style="margin-top: 1.5rem; text-align: center;">
+        <p style="margin-bottom: 1rem;">📥 Завантажити всі питання для навчання:</p>
+        <a href="{{ url_for('main.export_study', format='json') }}" class="btn btn-outline btn-sm">
+            JSON
+        </a>
+        <a href="{{ url_for('main.export_study', format='csv') }}" class="btn btn-outline btn-sm" style="margin-left: 0.5rem;">
+            CSV
+        </a>
+    </div>
+</div>
+
+<script>
+// Згортання/розгортання карти питань
+function toggleQuestionMap() {
+    const map = document.getElementById('question-map');
+    const icon = document.getElementById('map-toggle-icon');
+    const text = document.getElementById('map-toggle-text');
+    
+    if (map.classList.contains('collapsed')) {
+        map.classList.remove('collapsed');
+        icon.textContent = '▼';
+        text.textContent = 'Приховати';
+    } else {
+        map.classList.add('collapsed');
+        icon.textContent = '▶';
+        text.textContent = 'Показати';
+    }
+}
+
+// Клавіатурна навігація
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft') {
+        const btnPrev = document.getElementById('btn-prev');
+        if (btnPrev && btnPrev.style.visibility !== 'hidden') {
+            btnPrev.click();
+        }
+    } else if (e.key === 'ArrowRight') {
+        const btnNext = document.getElementById('btn-next');
+        if (btnNext) {
+            btnNext.click();
+        }
+    }
+});
+</script>
+{% endblock %}

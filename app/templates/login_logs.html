@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Логи входів - {{ user.username }} - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>📋 Логи входів: {{ user.get_full_name() or user.username }}</h1>
+        <a href="{{ url_for('main.admin') }}" class="btn btn-outline">
+            <span>←</span> Назад
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Інформація про користувача</h2>
+        </div>
+        <div style="padding: 1rem;">
+            <p><strong>Ім'я користувача:</strong> {{ user.username }}</p>
+            <p><strong>ПІБ:</strong> {{ user.get_full_name() or '—' }}</p>
+            <p><strong>Роль:</strong> {{ user.get_role_display() }}</p>
+            <p><strong>Статус:</strong> {% if user.is_active %}<span class="badge badge-success">Активний</span>{% else %}<span class="badge badge-danger">Неактивний</span>{% endif %}</p>
+            <p><strong>Загальна кількість входів:</strong> {{ user.login_count }}</p>
+            <p><strong>Останній вхід:</strong> {{ user.last_login.strftime('%d.%m.%Y %H:%M') if user.last_login else '—' }}</p>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">Історія входів</h2>
+        </div>
+        
+        {% if logs %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Дата та час входу</th>
+                        <th>Дата та час виходу</th>
+                        <th>Тривалість</th>
+                        <th>IP адреса</th>
+                        <th>Браузер / Пристрій</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ log.login_at.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+                        <td>
+                            {% if log.logout_at %}
+                                {{ log.logout_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                            {% else %}
+                                <span style="color: var(--text-secondary);">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.logout_at %}
+                                {% set duration = (log.logout_at - log.login_at).total_seconds() // 60 %}
+                                {% if duration < 60 %}
+                                    {{ duration|int }} хв
+                                {% else %}
+                                    {{ (duration // 60)|int }} год {{ (duration % 60)|int }} хв
+                                {% endif %}
+                            {% else %}
+                                <span style="color: var(--text-secondary);">—</span>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ log.ip_address or '—' }}</code></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ log.user_agent or '' }}">
+                            {{ log.user_agent or '—' }}
+                        </td>
+                        <td>
+                            {% if log.is_successful %}
+                                <span class="badge badge-success">Успішно</span>
+                            {% else %}
+                                <span class="badge badge-danger">Помилка</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>Немає записів про входи</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

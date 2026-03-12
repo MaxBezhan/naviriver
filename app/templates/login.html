@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Вхід - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="login-box fade-in">
+    <div class="login-logo">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">⚓</div>
+        <h1>Тренажер для судноводіїв</h1>
+        <p>Курси судноводіїв "Навірівер"</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('main.login') }}">
+        <div class="form-group">
+            <label class="form-label" for="username">Ім'я користувача</label>
+            <input type="text" class="form-control" id="username" name="username" required autofocus>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="password">Пароль</label>
+            <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-block">
+            <span>🔐</span>
+            Увійти
+        </button>
+    </form>
+
+    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); text-align: center;">
+        <p style="font-size: 0.875rem; color: var(--text-secondary);">
+            32302, Хмельницька область<br>
+            м. Кам'янець-Подільський<br>
+            вул. Нігинське шосе, 3<br><br>
+            📞 +380 96 358 0694<br>
+            ✉️ tovnaviriver@ukr.net
+        </p>
+    </div>
+</div>
+{% endblock %}

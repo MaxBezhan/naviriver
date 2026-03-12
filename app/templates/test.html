@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}Тестування - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="test-container" id="test-container">
+    <!-- Приховані поля для JavaScript -->
+    <input type="hidden" id="total-questions" value="{{ total }}">
+    <input type="hidden" id="timer-mode" value="{{ test_session.timer_mode }}">
+    <input type="hidden" id="show-feedback" value="{{ test_session.show_feedback }}">
+    <input type="hidden" id="test-mode" value="{{ test_session.mode }}">
+    <input type="hidden" id="duration-seconds" value="{{ session.get('duration_seconds', 0) }}">
+    <input type="hidden" id="can-change-answer" value="{{ 'true' if test_session.show_feedback == 'end' else 'false' }}">
+    <input type="hidden" id="auto-advance" value="{{ 'true' if test_session.show_feedback == 'instant' else 'false' }}">
+
+    <!-- Заголовок тесту -->
+    <div class="test-header">
+        <div class="test-progress">
+            <span>Питання <strong>{{ current_index }}</strong> з <strong>{{ total }}</strong></span>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ (current_index / total * 100) }}%"></div>
+            </div>
+        </div>
+        <div class="timer" id="timer">00:00</div>
+    </div>
+
+    <!-- Питання -->
+    <div class="question-card">
+        <div class="question-number">Розділ {{ question.section }}</div>
+        <div class="question-text">{{ question.text }}</div>
+        
+        {% if question.image_base64 %}
+        <img src="{{ question.image_base64 }}" alt="Зображення до питання" class="question-image">
+        {% endif %}
+
+        <!-- Варіанти відповідей -->
+        <div class="options-list" id="options-list">
+            {% for opt in options %}
+            <div class="option-item {% if existing_answer and existing_answer.key == opt.key %}selected{% endif %}" 
+                 data-question-id="{{ question.id }}" 
+                 data-option-key="{{ opt.key }}"
+                 data-original-index="{{ opt.original_index }}"
+                 {% if existing_answer and test_session.show_feedback != 'end' %}disabled{% endif %}">
+                <div class="option-text" style="padding-left: 0;">{{ opt.text }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Навігація під питанням -->
+        <div class="test-navigation" style="margin-top: 1.5rem;">
+            <a href="{{ url_for('main.test_prev') }}" class="btn btn-outline btn-sm" id="btn-prev" 
+               {% if current_index == 1 %}style="visibility: hidden;"{% endif %}>
+                <span>←</span> Попереднє
+            </a>
+            
+            <div class="test-nav-center">
+                {% if test_session.show_feedback == 'instant' %}
+                <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: var(--font-size-sm);">
+                    <input type="checkbox" id="auto-advance-toggle" checked>
+                    Автоперехід
+                </label>
+                {% endif %}
+            </div>
+            
+            {% if current_index < total %}
+            <a href="{{ url_for('main.test_next') }}" class="btn btn-primary btn-sm" id="btn-next">
+                Наступне <span>→</span>
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-success btn-sm" id="btn-finish" onclick="finishTest()">
+                <span>✓</span> Завершити
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Карта питань (згортається) -->
+    <div class="question-map-container">
+        <div class="question-map-header" onclick="toggleQuestionMap()">
+            <span style="font-weight: 600; font-size: var(--font-size-sm);">🗺️ Карта питань</span>
+            <button type="button" class="question-map-toggle" id="map-toggle-btn">
+                <span id="map-toggle-icon">▼</span> <span id="map-toggle-text">Приховати</span>
+            </button>
+        </div>
+        <div class="question-map" id="question-map">
+            {% for i in range(1, total + 1) %}
+            {% set q_id = questions[i-1] %}
+            {% set q_obj = question_objects[i-1] %}
+            {% set q_id_str = q_id | string %}
+            {% set ans_data = answers_data[q_id_str] if answers_data and q_id_str in answers_data else None %}
+            {% set is_correct = ans_data.is_correct | default(False) %}
+            {% set is_answered = ans_data is not none %}
+            <a href="{{ url_for('main.test_go_to', index=i-1) }}" 
+               class="question-map-item 
+                      {% if i == current_index %}current{% endif %}
+                      {% if show_feedback == 'instant' and is_answered %}
+                          {% if is_correct %}correct-answer{% else %}wrong-answer{% endif %}
+                      {% elif show_feedback == 'end' and is_answered %}passed{% endif %}" 
+               id="map-item-{{ i }}"
+               data-question-id="{{ q_id }}"
+               data-correct="{{ q_obj.correct }}"
+               title="Перейти до питання {{ i }}">
+                {{ i }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Кнопка дострокового завершення -->
+    <div style="text-align: center; margin-top: 1rem;">
+        <button type="button" class="btn btn-danger btn-xs" onclick="finishTestEarly()">
+            <span>⏹</span> Завершити достроково
+        </button>
+    </div>
+
+    <!-- Форма завершення -->
+    <form method="POST" action="{{ url_for('main.test_finish') }}" id="finish-test-form" style="display: none;">
+    </form>
+</div>
+
+<script>
+// Таймер
+let timerInterval;
+let elapsedSeconds = 0;
+
+function startTimer() {
+    const timerMode = document.getElementById('timer-mode').value;
+    const durationSeconds = parseInt(document.getElementById('duration-seconds').value) || 0;
+    const timerElement = document.getElementById('timer');
+    
+    if (timerMode === 'limited' && durationSeconds > 0) {
+        let remaining = durationSeconds;
+        
+        timerInterval = setInterval(() => {
+            remaining--;
+            elapsedSeconds++;
+            
+            const mins = Math.floor(remaining / 60);
+            const secs = remaining % 60;
+            timerElement.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            if (remaining <= 60) {
+                timerElement.classList.add('danger');
+            } else if (remaining <= 180) {
+                timerElement.classList.add('warning');
+            }
+            
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                alert('Час вичерпано! Тест буде завершено.');
+                document.getElementById('finish-test-form').submit();
+            }
+        }, 1000);
+    } else {
+        timerInterval = setInterval(() => {
+            elapsedSeconds++;
+            const mins = Math.floor(elapsedSeconds / 60);
+            const secs = elapsedSeconds % 60;
+            timerElement.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+}
+
+// Згортання/розгортання карти питань
+function toggleQuestionMap() {
+    const map = document.getElementById('question-map');
+    const icon = document.getElementById('map-toggle-icon');
+    const text = document.getElementById('map-toggle-text');
+    
+    if (map.classList.contains('collapsed')) {
+        map.classList.remove('collapsed');
+        icon.textContent = '▼';
+        text.textContent = 'Приховати';
+    } else {
+        map.classList.add('collapsed');
+        icon.textContent = '▶';
+        text.textContent = 'Показати';
+    }
+}
+
+// Оновлення кольору квадрата в карті питань
+function updateMapItemColor(questionId, isCorrect) {
+    const showFeedback = document.getElementById('show-feedback').value;
+    const mapItem = document.querySelector(`.question-map-item[data-question-id="${questionId}"]`);
+    
+    if (mapItem && showFeedback === 'instant') {
+        mapItem.classList.remove('answered', 'correct-answer', 'wrong-answer', 'passed');
+        if (isCorrect) {
+            mapItem.classList.add('correct-answer');
+        } else {
+            mapItem.classList.add('wrong-answer');
+        }
+    } else if (mapItem && showFeedback === 'end') {
+        mapItem.classList.remove('answered', 'correct-answer', 'wrong-answer');
+        mapItem.classList.add('passed');
+    }
+}
+
+// Делегування подій - ОДИН обробник на весь список
+document.addEventListener('DOMContentLoaded', function() {
+    const optionsList = document.getElementById('options-list');
+    if (!optionsList) {
+        console.error('ERROR: options-list not found!');
+        return;
+    }
+    
+    // Логуємо всі варіанти для перевірки
+    const allOptions = document.querySelectorAll('.option-item');
+    console.log('DEBUG JS: Found ' + allOptions.length + ' option items');
+    allOptions.forEach((opt, i) => {
+        const qid = opt.getAttribute('data-question-id');
+        const key = opt.getAttribute('data-option-key');
+        const idx = opt.getAttribute('data-original-index');
+        console.log('DEBUG JS: Option ' + i + ': qid=' + qid + ', key=' + key + ', idx=' + idx);
+        // Перевіряємо чи всі атрибути присутні
+        if (!qid || key === null || idx === null) {
+            console.error('DEBUG JS: Missing attribute in option ' + i);
+            console.error('DEBUG JS: OuterHTML:', opt.outerHTML);
+        }
+    });
+    
+    let lastClickTime = 0;
+
+    optionsList.addEventListener('click', function(e) {
+    // Знаходимо клікнутий елемент
+    const option = e.target.closest('.option-item');
+    if (!option) return;
+    
+    // Захист від подвійного кліку (300ms)
+    const now = Date.now();
+    if (now - lastClickTime < 300) {
+        console.log('Подвійний клік заблоковано');
+        return;
+    }
+    lastClickTime = now;
+    
+    // Якщо варіант заблокований - виходимо
+    if (option.classList.contains('disabled')) return;
+    
+    // Отримуємо дані з атрибутів (getAttribute надійніше за dataset)
+    const questionId = option.getAttribute('data-question-id');
+    const optionKey = option.getAttribute('data-option-key');
+    const originalIndex = option.getAttribute('data-original-index');
+    
+    console.log('DEBUG JS: Raw attributes - questionId=' + questionId + ', optionKey=' + optionKey + ', originalIndex=' + originalIndex);
+    console.log('DEBUG JS: Parsed - parseInt(questionId)=' + parseInt(questionId) + ', parseInt(originalIndex)=' + parseInt(originalIndex));
+    
+    // Перевіряємо чи всі дані присутні
+    if (!questionId || optionKey === null || optionKey === undefined || originalIndex === null || originalIndex === undefined) {
+        console.error('DEBUG JS: Missing data! questionId=' + questionId + ', optionKey=' + optionKey + ', originalIndex=' + originalIndex);
+        console.error('DEBUG JS: Element attributes:', {
+            'data-question-id': option.getAttribute('data-question-id'),
+            'data-option-key': option.getAttribute('data-option-key'),
+            'data-original-index': option.getAttribute('data-original-index')
+        });
+        alert('Помилка: не вдалося отримати дані відповіді');
+        return;
+    }
+    
+    const canChange = document.getElementById('can-change-answer').value === 'true';
+    const autoAdvance = document.getElementById('auto-advance').value === 'true';
+    const autoAdvanceToggle = document.getElementById('auto-advance-toggle');
+    const shouldAutoAdvance = autoAdvance && (!autoAdvanceToggle || autoAdvanceToggle.checked);
+    
+    // Якщо не можна змінювати відповідь і вже вибрано - виходимо
+    if (!canChange && option.classList.contains('selected')) {
+        return;
+    }
+    
+    // Знімаємо вибір з усіх варіантів
+    document.querySelectorAll('.option-item').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    
+    // Вибираємо поточний
+    option.classList.add('selected');
+    
+    // Блокуємо всі варіанти якщо не можна змінювати
+    if (!canChange) {
+        document.querySelectorAll('.option-item').forEach(opt => {
+            opt.classList.add('disabled');
+        });
+    }
+    
+    // Формуємо дані для відправки
+    const requestData = {
+        question_id: parseInt(questionId),
+        selected_key: String(optionKey),
+        selected_index: parseInt(originalIndex)
+    };
+    
+    console.log('DEBUG JS: Request data object:', requestData);
+    console.log('DEBUG JS: JSON stringified:', JSON.stringify(requestData));
+    console.log('DEBUG JS: Types - question_id:', typeof requestData.question_id, 
+                'selected_key:', typeof requestData.selected_key, 
+                'selected_index:', typeof requestData.selected_index);
+    
+    // Відправляємо на сервер
+    const jsonBody = JSON.stringify(requestData);
+    console.log('DEBUG JS: About to send fetch request');
+    console.log('DEBUG JS: URL:', '/test/answer');
+    console.log('DEBUG JS: Body:', jsonBody);
+    
+    fetch('/test/answer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json'
+        },
+        body: jsonBody
+    })
+    .then(response => {
+        console.log('DEBUG JS: Response status:', response.status);
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error('HTTP ' + response.status + ': ' + text);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('DEBUG JS: Response data:', data);
+        // Оновлюємо карту питань з кольором
+        updateMapItemColor(questionId, data.correct);
+        
+        // Автоперехід якщо увімкнено
+        if (shouldAutoAdvance && data.correct !== undefined) {
+            setTimeout(() => {
+                const btnNext = document.getElementById('btn-next');
+                const btnFinish = document.getElementById('btn-finish');
+                if (btnNext) {
+                    window.location.href = btnNext.href;
+                } else if (btnFinish) {
+                    finishTest();
+                }
+            }, 800);
+        }
+    })
+    .catch(error => {
+        console.error('DEBUG JS: Error:', error);
+        alert('Помилка збереження відповіді: ' + error.message);
+    });
+});
+}); // Закриття DOMContentLoaded
+
+// Клавіатурна навігація
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft') {
+        const btnPrev = document.getElementById('btn-prev');
+        if (btnPrev && btnPrev.style.visibility !== 'hidden') {
+            btnPrev.click();
+        }
+    } else if (e.key === 'ArrowRight') {
+        const btnNext = document.getElementById('btn-next');
+        const btnFinish = document.getElementById('btn-finish');
+        if (btnNext) {
+            btnNext.click();
+        } else if (btnFinish) {
+            finishTest();
+        }
+    } else if (e.key >= '1' && e.key <= '3') {
+        const index = parseInt(e.key) - 1;
+        const options = document.querySelectorAll('.option-item:not(.disabled)');
+        if (options[index]) {
+            options[index].click();
+        }
+    }
+});
+
+function finishTest() {
+    const answered = document.querySelectorAll('.question-map-item.correct-answer, .question-map-item.wrong-answer, .question-map-item.passed').length;
+    const total = {{ total }};
+    
+    if (answered < total) {
+        if (!confirm(`Ви відповіли на ${answered} з ${total} питань. Завершити тест?`)) {
+            return;
+        }
+    }
+    
+    clearInterval(timerInterval);
+    document.getElementById('finish-test-form').submit();
+}
+
+function finishTestEarly() {
+    const answered = document.querySelectorAll('.question-map-item.correct-answer, .question-map-item.wrong-answer, .question-map-item.passed').length;
+    const total = {{ total }};
+    
+    if (confirm(`Ви відповіли на ${answered} з ${total} питань. Ви впевнені, що хочете завершити тест достроково?`)) {
+        clearInterval(timerInterval);
+        document.getElementById('finish-test-form').submit();
+    }
+}
+
+// Запуск таймера
+startTimer();
+</script>
+{% endblock %}

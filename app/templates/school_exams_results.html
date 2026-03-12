@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Результати іспитів - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>📊 Результати шкільних іспитів</h1>
+        <a href="{{ url_for('main.groups_list') }}" class="btn btn-outline">
+            <span>←</span> Назад до груп
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Всі результати</h2>
+        </div>
+        
+        {% if results %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Слухач</th>
+                        <th>Група</th>
+                        <th>Іспит</th>
+                        <th>Категорія</th>
+                        <th>Дата</th>
+                        <th>Час</th>
+                        <th>Результат</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr>
+                        <td>
+                            <strong>{{ result.user.get_full_name() or result.user.username }}</strong>
+                        </td>
+                        <td>{{ result.exam.group.name }}</td>
+                        <td>{{ result.exam.name }}</td>
+                        <td>{{ result.exam.category.name }}</td>
+                        <td>{{ result.completed_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ result.get_time_spent_formatted() }}</td>
+                        <td>
+                            {% if result.is_passed %}
+                                <span class="badge badge-success">✓ Складено</span>
+                            {% else %}
+                                <span class="badge badge-danger">✗ Не складено</span>
+                            {% endif %}
+                            <br><small>{{ result.correct_answers }}/{{ result.total_questions }} правильно</small>
+                        </td>
+                        <td class="actions">
+                            <a href="{{ url_for('main.school_exam_result', result_id=result.id) }}" class="btn btn-primary btn-xs" title="Переглянути">
+                                👁️
+                            </a>
+                            {% if current_user.role in ['school_admin', 'system_admin'] %}
+                            <form method="POST" action="{{ url_for('main.reset_school_exam_result', result_id=result.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('СКИНУТИ результат іспиту для &quot;{{ result.user.get_full_name() or result.user.username }}&quot;? Слухач зможе пройти іспит повторно.')">
+                                <button type="submit" class="btn btn-warning btn-xs" title="Скинути результат">
+                                    🔄
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <p>Ще немає результатів іспитів</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Профіль - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <h1 style="margin-bottom: 2rem;">👤 Мій профіль</h1>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+        <!-- Основна інформація -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Особисті дані</h2>
+            </div>
+
+            <form method="POST" action="{{ url_for('main.profile') }}" enctype="multipart/form-data">
+                <!-- Аватар -->
+                <div class="form-group" style="text-align: center;">
+                    {% if current_user.avatar_url %}
+                    <img src="{{ current_user.avatar_url }}" alt="Аватар" 
+                         style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem;">
+                    {% else %}
+                    <div style="width: 120px; height: 120px; border-radius: 50%; background: var(--light-bg); 
+                                display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <span style="font-size: 3rem;">👤</span>
+                    </div>
+                    {% endif %}
+                    <input type="file" class="form-control" name="avatar" accept="image/*">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ім'я користувача</label>
+                    <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Прізвище *</label>
+                    <input type="text" class="form-control" name="last_name" value="{{ current_user.last_name or '' }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ім'я *</label>
+                    <input type="text" class="form-control" name="first_name" value="{{ current_user.first_name or '' }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">По батькові</label>
+                    <input type="text" class="form-control" name="middle_name" value="{{ current_user.middle_name or '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Телефон *</label>
+                    <input type="tel" class="form-control" name="phone" value="{{ current_user.phone or '' }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email *</label>
+                    <input type="email" class="form-control" name="email" value="{{ current_user.email or '' }}" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    <span>💾</span> Зберегти зміни
+                </button>
+            </form>
+        </div>
+
+        <!-- Інформація про аккаунт -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Інформація про аккаунт</h2>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Роль</p>
+                    <p style="font-weight: 600;">{{ current_user.get_role_display() }}</p>
+                </div>
+
+                {% if current_user.school %}
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Заклад</p>
+                    <p style="font-weight: 600;">{{ current_user.school.name }}</p>
+                </div>
+                {% endif %}
+
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Дата реєстрації</p>
+                    <p>{{ current_user.account_created_at.strftime('%d.%m.%Y') if current_user.account_created_at else '—' }}</p>
+                </div>
+
+                {% if current_user.account_expires_at %}
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Термін дії</p>
+                    <p {% if current_user.is_account_expired() %}style="color: var(--danger-color);"{% endif %}>
+                        {{ current_user.account_expires_at.strftime('%d.%m.%Y') }}
+                        {% if current_user.is_account_expired() %}(закінчився){% endif %}
+                    </p>
+                </div>
+                {% endif %}
+
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Останній вхід</p>
+                    <p>{{ current_user.last_login.strftime('%d.%m.%Y %H:%M') if current_user.last_login else '—' }}</p>
+                </div>
+
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Кількість входів</p>
+                    <p>{{ current_user.login_count }}</p>
+                </div>
+
+                {% if current_user.data_processing_consent %}
+                <div style="background: #dcfce7; padding: 1rem; border-radius: var(--radius);">
+                    <p style="color: #166534; font-size: 0.875rem; margin: 0;">
+                        ✅ Погодження на обробку персональних даних надано 
+                        {{ current_user.consent_date.strftime('%d.%m.%Y') if current_user.consent_date else '' }}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <a href="{{ url_for('main.change_password') }}" class="btn btn-outline btn-block">
+                    <span>🔑</span> Змінити пароль
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

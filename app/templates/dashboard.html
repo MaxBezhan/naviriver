@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}Панель керування - Тренажер для судноводіїв{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Інформація про школу -->
+    <div class="card" style="text-align: center; background: linear-gradient(135deg, #dbeafe, #e0f2fe); margin-bottom: 2rem;">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚓</div>
+        <h2 style="color: #1e40af; margin-bottom: 0.5rem;">Курси судноводіїв "Навірівер"</h2>
+        <p style="color: #3b82f6;">
+            Проводимо навчання судноводіїв та підготовку до здачі екзаменів<br>
+            на право керування маломірними суднами та гідроциклами
+        </p>
+    </div>
+
+    <h1 style="margin-bottom: 0.5rem;">Ласкаво просимо, {{ current_user.get_full_name() or current_user.username }}!</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+        Роль: <span class="badge badge-info">{{ current_user.get_role_display() }}</span>
+        {% if current_user.school %}
+        | Заклад: {{ current_user.school.name }}
+        {% endif %}
+        {% if current_user.account_expires_at %}
+        | Термін дії: до {{ current_user.account_expires_at.strftime('%d.%m.%Y') }}
+        {% endif %}
+    </p>
+
+    <!-- Статистика -->
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">📚</div>
+            <div>
+                <div class="stat-value" id="stat-total-tests">{{ user_stats.total_tests }}</div>
+                <div class="stat-label">Пройдено тестів</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green">📊</div>
+            <div>
+                <div class="stat-value" id="stat-avg-score">{{ user_stats.average_score }}%</div>
+                <div class="stat-label">Середній результат</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">❓</div>
+            <div>
+                <div class="stat-value">{{ total_questions }}</div>
+                <div class="stat-label">Питань в базі</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red">⚠️</div>
+            <div>
+                <div class="stat-value" id="stat-mistakes">{{ user_stats.mistakes_count }}</div>
+                <div class="stat-label">Помилок для вивчення</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Групи та іспити для слухачів -->
+    {% if current_user.role == 'student' %}
+    {% set student_groups = current_user.student_groups %}
+    {% if student_groups %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">👥 Мої групи</h2>
+        </div>
+        <div style="padding: 1rem;">
+            {% for group in student_groups %}
+            <div style="padding: 0.75rem; background: var(--bg-color); border-radius: 8px; margin-bottom: 0.5rem;">
+                <strong>{{ group.name }}</strong>
+                <span style="color: var(--text-secondary);">— {{ group.teacher.get_full_name() or group.teacher.username }}</span>
+            </div>
+            {% endfor %}
+            <a href="{{ url_for('main.my_school_exams') }}" class="btn btn-primary btn-sm" style="margin-top: 0.5rem;">
+                📝 Перейти до іспитів
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Вибір бази питань (для слухачів) -->
+    {% if current_user.role == 'student' and available_banks|length > 1 %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📚 База питань</h2>
+        </div>
+        <form method="POST" action="{{ url_for('main.select_bank') }}">
+            <div class="form-group">
+                <label class="form-label">Виберіть базу питань для тренування:</label>
+                <select class="form-select" name="bank_id" onchange="this.form.submit()">
+                    {% for bank in available_banks %}
+                    <option value="{{ bank.id }}" {% if active_bank_id == bank.id %}selected{% endif %}>
+                        {{ bank.name }} {% if bank.level == 'system' %}(Загальна){% elif bank.level == 'school' %}(Школа){% else %}(Викладач){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Режими тестування -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">🎯 Режими тестування</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.start_test') }}" id="test-form">
+            <div class="modes-grid" style="margin-bottom: 1.5rem;">
+                <!-- По розділах -->
+                <div class="mode-card" onclick="selectMode('sections')">
+                    <div class="mode-icon">📑</div>
+                    <div class="mode-title">По розділах</div>
+                    <div class="mode-description">Питання з конкретного розділу</div>
+                    <input type="radio" name="mode" value="sections" id="mode-sections" style="display: none;">
+                </div>
+
+                <!-- Випадкові -->
+                <div class="mode-card" onclick="selectMode('random')">
+                    <div class="mode-icon">🎲</div>
+                    <div class="mode-title">Випадкові питання</div>
+                    <div class="mode-description">Випадковий набір питань</div>
+                    <input type="radio" name="mode" value="random" id="mode-random" style="display: none;" checked>
+                </div>
+
+                <!-- Іспит -->
+                <div class="mode-card" onclick="selectMode('exam')">
+                    <div class="mode-icon">📝</div>
+                    <div class="mode-title">Іспит (10 питань, 20 хв)</div>
+                    <div class="mode-description">Симуляція іспиту</div>
+                    <input type="radio" name="mode" value="exam" id="mode-exam" style="display: none;">
+                </div>
+
+                <!-- За категорією -->
+                <div class="mode-card" onclick="selectMode('category')">
+                    <div class="mode-icon">🏷️</div>
+                    <div class="mode-title">За категорією</div>
+                    <div class="mode-description">МС або ГЦ</div>
+                    <input type="radio" name="mode" value="category" id="mode-category" style="display: none;">
+                </div>
+
+                <!-- Помилки -->
+                <div class="mode-card" onclick="selectMode('mistakes')">
+                    <div class="mode-icon">❌</div>
+                    <div class="mode-title">Помилки</div>
+                    <div class="mode-description">Питання, де були помилки</div>
+                    <input type="radio" name="mode" value="mistakes" id="mode-mistakes" style="display: none;">
+                </div>
+
+                <!-- Непройдені -->
+                <div class="mode-card" onclick="selectMode('unanswered')">
+                    <div class="mode-icon">🆕</div>
+                    <div class="mode-title">Непройдені</div>
+                    <div class="mode-description">Нові питання</div>
+                    <input type="radio" name="mode" value="unanswered" id="mode-unanswered" style="display: none;">
+                </div>
+
+                <!-- Навчання -->
+                <div class="mode-card" onclick="selectMode('study')">
+                    <div class="mode-icon">📖</div>
+                    <div class="mode-title">Навчання</div>
+                    <div class="mode-description">З показом правильних відповідей</div>
+                    <input type="radio" name="mode" value="study" id="mode-study" style="display: none;">
+                </div>
+            </div>
+
+            <!-- Налаштування -->
+            <div class="card" style="background: var(--light-bg);">
+                <h3 style="margin-bottom: 1rem;">⚙️ Налаштування тесту</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    <!-- Вибір розділу -->
+                    <div class="form-group" id="section-select" style="display: none;">
+                        <label class="form-label">Розділ</label>
+                        <select class="form-select" name="section">
+                            <option value="">Всі розділи</option>
+                            {% for section in sections %}
+                            <option value="{{ section }}">Розділ {{ section }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Вибір категорії -->
+                    <div class="form-group" id="category-select" style="display: none;">
+                        <label class="form-label">Категорія</label>
+                        <select class="form-select" name="category">
+                            <option value="">Всі категорії</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.code }}">{{ cat.name }} ({{ cat.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Кількість питань -->
+                    <div class="form-group" id="count-select">
+                        <label class="form-label">Кількість питань</label>
+                        <select class="form-select" name="count">
+                            <option value="10">10 питань</option>
+                            <option value="20">20 питань</option>
+                            <option value="30">30 питань</option>
+                            <option value="50" selected>50 питань</option>
+                            <option value="100">100 питань</option>
+                            <option value="0">Всі питання</option>
+                        </select>
+                    </div>
+
+                    <!-- Таймер -->
+                    <div class="form-group">
+                        <label class="form-label">Таймер</label>
+                        <select class="form-select" name="timer_mode">
+                            <option value="unlimited">Без обмеження</option>
+                            <option value="limited">2 хвилини на питання</option>
+                        </select>
+                    </div>
+
+                    <!-- Зворотній зв'язок -->
+                    <div class="form-group">
+                        <label class="form-label">Показувати результат</label>
+                        <select class="form-select" name="show_feedback">
+                            <option value="instant">Відразу після відповіді</option>
+                            <option value="end">Тільки в кінці</option>
+                        </select>
+                    </div>
+
+                    <!-- Перемішування питань -->
+                    <div class="form-group">
+                        <label class="form-label" style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="shuffle" style="margin-right: 0.5rem; width: 18px; height: 18px;">
+                            Перемішувати питання
+                        </label>
+                    </div>
+
+                    <!-- Перемішування відповідей -->
+                    <div class="form-group">
+                        <label class="form-label" style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="shuffle_options" style="margin-right: 0.5rem; width: 18px; height: 18px;">
+                            Перемішувати відповіді
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <span>▶️</span>
+                    Почати тестування
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Статистика слухачів (для викладача та адміністраторів) -->
+    {% if current_user.role in ['teacher', 'school_admin', 'system_admin'] and students_stats %}
+    <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+            <h2 class="card-title">📊 Статистика слухачів</h2>
+            {% if current_user.role == 'teacher' %}
+            <span class="badge badge-info">Мої слухачі</span>
+            {% elif current_user.role == 'school_admin' %}
+            <span class="badge badge-warning">Заклад</span>
+            {% endif %}
+        </div>
+        
+        {% if students_stats %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Слухач</th>
+                        <th>Тестів</th>
+                        <th>Середній бал</th>
+                        <th>Пройдено питань</th>
+                        <th>Помилок</th>
+                        <th>Останній вхід</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in students_stats %}
+                    <tr>
+                        <td>
+                            <strong>{{ stat.user.get_full_name() or stat.user.username }}</strong>
+                            <br><small style="color: var(--text-secondary);">{{ stat.user.username }}</small>
+                        </td>
+                        <td>{{ stat.total_tests }}</td>
+                        <td>
+                            {% if stat.average_score > 80 %}
+                                <span style="color: var(--success-color); font-weight: 600;">{{ stat.average_score }}%</span>
+                            {% elif stat.average_score > 50 %}
+                                <span style="color: var(--warning-color); font-weight: 600;">{{ stat.average_score }}%</span>
+                            {% else %}
+                                <span style="color: var(--danger-color); font-weight: 600;">{{ stat.average_score }}%</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ stat.answered_count }}</td>
+                        <td>{{ stat.mistakes_count }}</td>
+                        <td>
+                            {% if stat.user.last_login %}
+                                {{ stat.user.last_login.strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                <span style="color: var(--text-secondary);">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if stat.user.is_account_expired() %}
+                                <span class="badge badge-danger">Термін закінчився</span>
+                            {% elif not stat.user.is_active %}
+                                <span class="badge badge-secondary">Неактивний</span>
+                            {% else %}
+                                <span class="badge badge-success">Активний</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <p>Немає слухачів для відображення</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function selectMode(mode) {
+    // Знімаємо виділення з усіх карток
+    document.querySelectorAll('.mode-card').forEach(card => {
+        card.style.borderColor = 'var(--border-color)';
+        card.style.background = 'white';
+    });
+    
+    // Виділяємо обрану
+    const selectedCard = document.querySelector(`#mode-${mode}`).closest('.mode-card');
+    selectedCard.style.borderColor = 'var(--primary-color)';
+    selectedCard.style.background = '#eff6ff';
+    
+    // Вибираємо радіокнопку
+    document.getElementById(`mode-${mode}`).checked = true;
+    
+    // Показуємо/приховуємо відповідні поля
+    const sectionSelect = document.getElementById('section-select');
+    const categorySelect = document.getElementById('category-select');
+    const countSelect = document.getElementById('count-select');
+    
+    sectionSelect.style.display = 'none';
+    categorySelect.style.display = 'none';
+    countSelect.style.display = 'block';
+    
+    if (mode === 'sections') {
+        sectionSelect.style.display = 'block';
+        countSelect.style.display = 'none';
+    } else if (mode === 'category' || mode === 'exam') {
+        categorySelect.style.display = 'block';
+    }
+    
+    if (mode === 'exam' || mode === 'mistakes' || mode === 'unanswered' || mode === 'study') {
+        countSelect.style.display = 'none';
+    }
+}
+
+// Ініціалізація
+selectMode('random');
+</script>
+{% endblock %}
