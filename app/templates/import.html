@@ -1,131 +1,169 @@
 {% extends "base.html" %}
 
-{% block title %}Імпорт питань - АЛЛІН Тренажер{% endblock %}
+{% block title %}Імпорт питань - Тренажер для судноводіїв{% endblock %}
 
 {% block content %}
 <div class="fade-in">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h1>📥 Імпорт питань</h1>
-        <a href="{{ url_for('main.editor') }}" class="btn btn-outline">
-            <span>←</span> Назад до редактора
-        </a>
+        <a href="{{ url_for('main.editor') }}" class="btn btn-outline btn-sm">← Назад до редактора</a>
     </div>
 
-    <!-- Статистика бази -->
-    <div class="dashboard-grid" style="margin-bottom: 2rem;">
+    <!-- Статистика -->
+    <div class="stats-grid" style="margin-bottom: 1.5rem;">
         <div class="stat-card">
-            <div class="stat-icon blue">📚</div>
-            <div>
-                <div class="stat-value">{{ stats.total }}</div>
-                <div class="stat-label">Всього питань</div>
-            </div>
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">Всього питань</div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon green">📂</div>
-            <div>
-                <div class="stat-value">{{ stats.sections }}</div>
-                <div class="stat-label">Розділів</div>
-            </div>
+            <div class="stat-value">{{ stats.with_images }}</div>
+            <div class="stat-label">З зображеннями</div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon orange">🖼️</div>
-            <div>
-                <div class="stat-value">{{ stats.with_images }}</div>
-                <div class="stat-label">З фото</div>
-            </div>
+            <div class="stat-value">{{ stats.ms_count }}</div>
+            <div class="stat-label">МС</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.gc_count }}</div>
+            <div class="stat-label">ГЦ</div>
         </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
-        <!-- Імпорт з JSON -->
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">📄 Імпорт з JSON</h2>
-            </div>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                Завантажте файл у форматі JSON з масивом об'єктів питань.
-            </p>
-            <form method="POST" action="{{ url_for('main.import_questions') }}" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label class="form-label">Файл JSON</label>
-                    <input type="file" class="form-control" name="file" accept=".json" required>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">
-                    <span>📤</span> Імпортувати JSON
-                </button>
-            </form>
+    <!-- Форма мульти-імпорту -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="padding: 1.5rem;">
+            <h3 style="margin-bottom: 1rem;">📁 Імпорт файлів</h3>
             
-            <div style="margin-top: 1.5rem; padding: 1rem; background: var(--light-bg); border-radius: var(--radius);">
-                <p style="font-weight: 600; margin-bottom: 0.5rem;">Формат JSON:</p>
-                <pre style="font-size: 0.75rem; overflow-x: auto;"><code>[{
-  "section": "1",
-  "text": "Текст питання",
-  "options": ["Варіант А", "Варіант Б", "Варіант В"],
-  "correct": 0,
-  "image": null
-}]</code></pre>
-            </div>
-        </div>
-
-        <!-- Імпорт з CSV -->
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">📊 Імпорт з CSV</h2>
-            </div>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                Завантажте файл у форматі CSV з роздільником.
-            </p>
-            <form method="POST" action="{{ url_for('main.import_questions') }}" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label class="form-label">Файл CSV</label>
-                    <input type="file" class="form-control" name="file" accept=".csv,.txt" required>
+            <form method="POST" action="{{ url_for('main.import_questions') }}" enctype="multipart/form-data" id="import-form">
+                <!-- Вибір категорії -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                        Категорія:
+                    </label>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px;">
+                            <input type="radio" name="category" value="MS" checked>
+                            <span>МС</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px;">
+                            <input type="radio" name="category" value="GC">
+                            <span>ГЦ</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px;">
+                            <input type="radio" name="category" value="BOTH">
+                            <span>🔗 Обидві</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Роздільник</label>
-                    <select class="form-select" name="delimiter">
-                        <option value=";">Крапка з комою (;)</option>
-                        <option value=",">Кома (,)</option>
-                        <option value="\t">Табуляція</option>
+
+                <!-- Вибір файлів (зворотна сумісність: file або files) -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                        Файл(и) (JSON або CSV):
+                    </label>
+                    
+                    <!-- Новий мульти-вибір -->
+                    <input type="file" name="files" id="files-input" multiple accept=".json,.csv" 
+                           style="display: none;" onchange="handleFiles(this)">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('files-input').click()">
+                        ➕ Додати файли
+                    </button>
+                    
+                    <!-- Старий одиночний вибір (прихований, для сумісності) -->
+                    <input type="file" name="file" id="file-input" accept=".json,.csv" 
+                           style="display: none;" onchange="handleSingleFile(this)">
+                    
+                    <span id="file-count" style="margin-left: 1rem; color: var(--text-secondary);">Файли не вибрано</span>
+                </div>
+
+                <!-- Список файлів -->
+                <div id="file-list" style="margin-bottom: 1rem; display: none;">
+                    <ul id="files-ul" style="list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;">
+                    </ul>
+                </div>
+
+                <!-- Роздільник для CSV -->
+                <div id="delimiter-box" style="margin-bottom: 1rem; display: none;">
+                    <label style="display: block; margin-bottom: 0.5rem;">Роздільник:</label>
+                    <select name="delimiter" class="form-select" style="width: auto;">
+                        <option value=";">;</option>
+                        <option value=",">,</option>
+                        <option value="\t">Tab</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">
-                    <span>📤</span> Імпортувати CSV
+
+                <button type="submit" class="btn btn-success" id="import-btn" disabled>
+                    📥 Імпортувати
                 </button>
             </form>
-            
-            <div style="margin-top: 1.5rem; padding: 1rem; background: var(--light-bg); border-radius: var(--radius);">
-                <p style="font-weight: 600; margin-bottom: 0.5rem;">Формат CSV:</p>
-                <pre style="font-size: 0.75rem; overflow-x: auto;"><code>section;question;option1;option2;option3;correct
-1;Текст питання;Варіант А;Варіант Б;Варіант В;0</code></pre>
-            </div>
         </div>
     </div>
 
-    <!-- Розподіл по розділах -->
-    {% if stats.section_breakdown %}
-    <div class="card" style="margin-top: 1.5rem;">
-        <div class="card-header">
-            <h2 class="card-title">📂 Розподіл по розділах</h2>
-        </div>
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Розділ</th>
-                        <th>Кількість питань</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for section, count in stats.section_breakdown.items() %}
-                    <tr>
-                        <td>Розділ {{ section }}</td>
-                        <td>{{ count }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Інструкція -->
+    <div class="card">
+        <div style="padding: 1.5rem;">
+            <h3 style="margin-bottom: 1rem;">📖 Формати файлів</h3>
+            <pre style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; overflow-x: auto;"><code>JSON: [{"section": "1", "text": "...", "option1": "...", "correct": 0}]
+CSV: section;question;option1;option2;option3;correct</code></pre>
         </div>
     </div>
-    {% endif %}
 </div>
+
+<script>
+let selectedFiles = [];
+
+function handleFiles(input) {
+    selectedFiles = Array.from(input.files);
+    updateFileList();
+}
+
+function handleSingleFile(input) {
+    if (input.files.length > 0) {
+        selectedFiles = [input.files[0]];
+        updateFileList();
+    }
+}
+
+function updateFileList() {
+    const fileCount = selectedFiles.length;
+    const fileCountSpan = document.getElementById('file-count');
+    const fileList = document.getElementById('file-list');
+    const filesUl = document.getElementById('files-ul');
+    const importBtn = document.getElementById('import-btn');
+    const delimiterBox = document.getElementById('delimiter-box');
+    
+    if (fileCount === 0) {
+        fileCountSpan.textContent = 'Файли не вибрано';
+        fileList.style.display = 'none';
+        importBtn.disabled = true;
+        delimiterBox.style.display = 'none';
+        return;
+    }
+    
+    fileCountSpan.textContent = `Вибрано ${fileCount} файл(ів)`;
+    fileList.style.display = 'block';
+    importBtn.disabled = false;
+    
+    const hasCsv = selectedFiles.some(f => f.name.toLowerCase().endsWith('.csv'));
+    delimiterBox.style.display = hasCsv ? 'block' : 'none';
+    
+    filesUl.innerHTML = selectedFiles.map((file, index) => {
+        const size = (file.size / 1024).toFixed(1);
+        return `
+            <li style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <span>📄 ${file.name} (${size} КБ)</span>
+                <button type="button" class="btn btn-danger btn-xs" onclick="removeFile(${index})">✕</button>
+            </li>
+        `;
+    }).join('');
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    const dataTransfer = new DataTransfer();
+    selectedFiles.forEach(file => dataTransfer.items.add(file));
+    document.getElementById('files-input').files = dataTransfer.files;
+    updateFileList();
+}
+</script>
 {% endblock %}

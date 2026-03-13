@@ -1,39 +1,308 @@
 {% extends "base.html" %}
 
-{% block title %}Статистика іспитів - {{ group.name }} - Тренажер для судноводіїв{% endblock %}
+{% block title %}Дашборд іспиту - {{ group.name }}{% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <div>
-            <h1>📊 Статистика іспитів</h1>
-            <p style="color: var(--text-secondary);">
-                Група: <strong>{{ group.name }}</strong> | 
-                Викладач: <strong>{{ group.teacher.get_full_name() or group.teacher.username }}</strong> | 
-                Слухачів: <strong>{{ group.get_students_count() }}</strong>
-            </p>
-        </div>
-        <div style="display: flex; gap: 0.5rem;">
-            <a href="{{ url_for('main.group_detail', group_id=group.id) }}" class="btn btn-outline">
-                <span>←</span> Назад до групи
-            </a>
-        </div>
+<style>
+/* Покращені стилі для читабельності */
+.exam-dashboard {
+    --border-color: #d1d5db;
+    --bg-light: #f8f9fa;
+    --bg-white: #ffffff;
+    --text-primary: #1f2937;
+    --text-secondary: #4b5563;
+    --text-muted: #6b7280;
+    --success-dark: #065f46;
+    --danger-dark: #991b1b;
+    --warning-dark: #92400e;
+    --info-dark: #1e40af;
+}
+
+/* Карти з чіткими межами */
+.dashboard-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.dashboard-card-header {
+    background: var(--bg-light);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.dashboard-card-body {
+    padding: 1.5rem;
+}
+
+/* Статистичні картки з чіткими межами */
+.stat-box {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.25rem;
+    text-align: center;
+    transition: box-shadow 0.2s;
+}
+
+.stat-box:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Кольорові індикатори (приглушені) */
+.stat-success { border-left: 3px solid #059669; }
+.stat-danger { border-left: 3px solid #dc2626; }
+.stat-warning { border-left: 3px solid #d97706; }
+.stat-neutral { border-left: 3px solid #6b7280; }
+
+.stat-success .stat-number { color: var(--success-dark); }
+.stat-danger .stat-number { color: var(--danger-dark); }
+.stat-warning .stat-number { color: var(--warning-dark); }
+.stat-neutral .stat-number { color: var(--text-secondary); }
+
+/* Таблиця з чіткими межами */
+.data-table-enhanced {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.95rem;
+}
+
+.data-table-enhanced th {
+    background: var(--bg-light);
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-primary);
+    font-weight: 600;
+    padding: 0.875rem 1rem;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.data-table-enhanced td {
+    border-bottom: 1px solid #e5e7eb;
+    color: var(--text-primary);
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.data-table-enhanced tr:hover td {
+    background: #f9fafb;
+}
+
+/* Статуси в таблиці (приглушені кольори) */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: var(--success-dark);
+}
+
+.status-in-progress {
+    background: #fef3c7;
+    color: var(--warning-dark);
+}
+
+.status-not-started {
+    background: #f3f4f6;
+    color: var(--text-muted);
+}
+
+.result-passed {
+    color: var(--success-dark);
+    font-weight: 600;
+}
+
+.result-failed {
+    color: var(--danger-dark);
+    font-weight: 600;
+}
+
+/* Прогрес-бар з чіткими межами */
+.progress-container {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.progress-bar-enhanced {
+    display: flex;
+    height: 28px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background: var(--bg-white);
+}
+
+.progress-segment {
+    height: 100%;
+    transition: opacity 0.2s;
+}
+
+.progress-segment:hover {
+    opacity: 0.85;
+}
+
+.segment-passed { background: #059669; }
+.segment-failed { background: #dc2626; }
+.segment-in-progress { background: #d97706; }
+.segment-not-started { background: #9ca3af; }
+
+.progress-legend {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+/* Кнопки дій */
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+}
+
+.action-btn-view {
+    background: var(--bg-light);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.action-btn-view:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+}
+
+.action-btn-reset {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: var(--danger-dark);
+}
+
+.action-btn-reset:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}
+
+/* Навігація */
+.page-nav {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.page-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--border-color);
+    background: var(--bg-white);
+    color: var(--text-primary);
+    transition: all 0.15s;
+}
+
+.page-nav a:hover {
+    background: var(--bg-light);
+    border-color: #9ca3af;
+}
+
+/* Адаптивність */
+@media (max-width: 768px) {
+    .data-table-enhanced th,
+    .data-table-enhanced td {
+        padding: 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    
+    .progress-legend {
+        gap: 1rem;
+    }
+}
+</style>
+
+<div class="exam-dashboard fade-in">
+    <!-- Навігація -->
+    <div class="page-nav">
+        <a href="{{ url_for('main.groups_list') }}">← Назад до груп</a>
+        <a href="{{ url_for('main.group_detail', group_id=group.id) }}">Деталі групи</a>
     </div>
 
-    <!-- Загальна статистика по групі -->
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-            <h2 class="card-title">📈 Загальна статистика</h2>
+    <h1 style="font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1.5rem;">
+        Статистика іспитів
+    </h1>
+
+    <!-- Інформація про групу -->
+    <div class="dashboard-card">
+        <div class="dashboard-card-header">
+            {{ group.name }}
         </div>
-        <div style="padding: 1.5rem;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">{{ group.get_students_count() }}</div>
-                    <div style="color: var(--text-secondary);">Всього слухачів</div>
+        <div class="dashboard-card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+                <div class="stat-box stat-neutral">
+                    <div class="stat-number">{{ group.get_students_count() }}</div>
+                    <div class="stat-label">Всього слухачів</div>
                 </div>
-                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--info-color);">{{ group.exams|length }}</div>
-                    <div style="color: var(--text-secondary);">Всього іспитів</div>
+                <div class="stat-box stat-neutral">
+                    <div class="stat-number">{{ group.exams|length }}</div>
+                    <div class="stat-label">Всього іспитів</div>
                 </div>
                 {% set total_passed = namespace(value=0) %}
                 {% set total_completed = namespace(value=0) %}
@@ -41,194 +310,222 @@
                     {% set total_passed.value = total_passed.value + stat.passed_count %}
                     {% set total_completed.value = total_completed.value + stat.completed_count %}
                 {% endfor %}
-                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--success-color);">{{ total_passed.value }}</div>
-                    <div style="color: var(--text-secondary);">Складено іспитів</div>
+                <div class="stat-box stat-success">
+                    <div class="stat-number">{{ total_passed.value }}</div>
+                    <div class="stat-label">Складено іспитів</div>
                 </div>
-                <div style="text-align: center; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--warning-color);">{{ total_completed.value - total_passed.value }}</div>
-                    <div style="color: var(--text-secondary);">Не складено</div>
+                <div class="stat-box stat-danger">
+                    <div class="stat-number">{{ total_completed.value - total_passed.value }}</div>
+                    <div class="stat-label">Не складено</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Статистика по кожному іспиту -->
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-            <h2 class="card-title">📝 Статистика по іспитах</h2>
+    <!-- Список іспитів -->
+    {% if exams_stats %}
+    <div class="dashboard-card">
+        <div class="dashboard-card-header">
+            Іспити групи
         </div>
-        
-        {% if exams_stats %}
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Назва іспиту</th>
-                        <th>Категорія</th>
-                        <th>Пройшли</th>
-                        <th>Складено</th>
-                        <th>Не складено</th>
-                        <th>В процесі</th>
-                        <th>Не розпочали</th>
-                        <th>Середній час</th>
-                        <th>Дії</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for stat in exams_stats %}
-                    <tr>
-                        <td><strong>{{ stat.exam.name }}</strong></td>
-                        <td>{{ stat.exam.category.name }}</td>
-                        <td>{{ stat.completed_count }} / {{ stat.total_students }}</td>
-                        <td><span class="badge badge-success">{{ stat.passed_count }}</span></td>
-                        <td><span class="badge badge-danger">{{ stat.failed_count }}</span></td>
-                        <td><span class="badge badge-warning">{{ stat.in_progress_count }}</span></td>
-                        <td><span class="badge badge-secondary">{{ stat.not_started_count }}</span></td>
-                        <td>
-                            {% if stat.avg_time > 0 %}
-                                {{ (stat.avg_time // 60)|int }}:{{ (stat.avg_time % 60)|int|string|format('%02d') }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a href="{{ url_for('main.exam_dashboard', group_id=group.id, exam_id=stat.exam.id) }}" class="btn btn-primary btn-sm">
-                                📊 Деталі
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="dashboard-card-body">
+            <div style="overflow-x: auto;">
+                <table class="data-table-enhanced">
+                    <thead>
+                        <tr>
+                            <th>Назва іспиту</th>
+                            <th>Категорія</th>
+                            <th style="text-align: center;">Пройшли</th>
+                            <th style="text-align: center;">Складено</th>
+                            <th style="text-align: center;">Не складено</th>
+                            <th style="text-align: center;">В процесі</th>
+                            <th style="text-align: center;">Не розпочали</th>
+                            <th style="text-align: center;">Середній час</th>
+                            <th style="text-align: center;">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in exams_stats %}
+                        <tr>
+                            <td style="font-weight: 500;">{{ stat.exam.name }}</td>
+                            <td style="color: var(--text-secondary);">{{ stat.exam.category.name }}</td>
+                            <td style="text-align: center;">{{ stat.completed_count }} / {{ stat.total_students }}</td>
+                            <td style="text-align: center;">
+                                <span style="color: var(--success-dark); font-weight: 600;">{{ stat.passed_count }}</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span style="color: var(--danger-dark); font-weight: 600;">{{ stat.failed_count }}</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span style="color: var(--warning-dark); font-weight: 600;">{{ stat.in_progress_count }}</span>
+                            </td>
+                            <td style="text-align: center; color: var(--text-muted);">{{ stat.not_started_count }}</td>
+                            <td style="text-align: center; font-family: monospace; font-size: 0.9rem;">
+                                {% if stat.avg_time > 0 %}
+                                    {{ (stat.avg_time // 60)|int }}:{{ '%02d'|format((stat.avg_time % 60)|int) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <a href="{{ url_for('main.exam_dashboard', group_id=group.id, exam_id=stat.exam.id) }}" class="action-btn action-btn-view">
+                                    📊 Деталі
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon">📝</div>
-            <p>У групи ще немає іспитів</p>
-        </div>
-        {% endif %}
     </div>
+    {% else %}
+    <div class="dashboard-card" style="text-align: center; padding: 3rem;">
+        <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📝</div>
+        <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">У групи ще немає іспитів</h3>
+        <p style="color: var(--text-muted);">Створіть перший іспит у розділі "Деталі групи"</p>
+    </div>
+    {% endif %}
 
-    <!-- Детальна статистика по вибраному іспиту -->
+    <!-- Деталі конкретного іспиту -->
     {% if exam_details %}
-    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary-color);">
-        <div class="card-header">
-            <h2 class="card-title">📋 Деталі іспиту: {{ exam_details.exam.name }}</h2>
-            <span class="badge badge-info">{{ exam_details.exam.category.name }}</span>
+    <div class="dashboard-card">
+        <div class="dashboard-card-header">
+            {{ exam_details.exam.name }}
         </div>
-        <div style="padding: 1.5rem;">
-            <!-- Прогрес проходження -->
-            <div style="margin-bottom: 2rem;">
-                <h3 style="margin-bottom: 1rem;">Прогрес проходження</h3>
-                <div style="display: flex; height: 30px; border-radius: 15px; overflow: hidden; margin-bottom: 1rem;">
-                    {% set total = exam_details.total_students %}
-                    {% set passed_width = (exam_details.passed_count / total * 100) if total > 0 else 0 %}
-                    {% set failed_width = (exam_details.failed_count / total * 100) if total > 0 else 0 %}
-                    {% set in_progress_width = (exam_details.in_progress_count / total * 100) if total > 0 else 0 %}
-                    {% set not_started_width = (exam_details.not_started_count / total * 100) if total > 0 else 0 %}
-                    
+        <div class="dashboard-card-body">
+            <!-- Статистика -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <div class="stat-box stat-success">
+                    <div class="stat-number">{{ exam_details.passed_count }}</div>
+                    <div class="stat-label">Складено</div>
+                </div>
+                <div class="stat-box stat-danger">
+                    <div class="stat-number">{{ exam_details.failed_count }}</div>
+                    <div class="stat-label">Не складено</div>
+                </div>
+                <div class="stat-box stat-warning">
+                    <div class="stat-number">{{ exam_details.in_progress_count }}</div>
+                    <div class="stat-label">В процесі</div>
+                </div>
+                <div class="stat-box stat-neutral">
+                    <div class="stat-number">{{ exam_details.not_started_count }}</div>
+                    <div class="stat-label">Не розпочали</div>
+                </div>
+            </div>
+
+            <!-- Прогрес-бар -->
+            <div class="progress-container">
+                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                    Прогрес проходження
+                </h3>
+                {% set total = exam_details.total_students %}
+                {% set passed_width = (exam_details.passed_count / total * 100) if total > 0 else 0 %}
+                {% set failed_width = (exam_details.failed_count / total * 100) if total > 0 else 0 %}
+                {% set in_progress_width = (exam_details.in_progress_count / total * 100) if total > 0 else 0 %}
+                {% set not_started_width = (exam_details.not_started_count / total * 100) if total > 0 else 0 %}
+                
+                <div class="progress-bar-enhanced">
                     {% if passed_width > 0 %}
-                    <div style="width: {{ passed_width }}%; background: var(--success-color);" title="Складено: {{ exam_details.passed_count }}"></div>
+                    <div class="progress-segment segment-passed" style="width: {{ passed_width }}%;" title="Складено: {{ exam_details.passed_count }}"></div>
                     {% endif %}
                     {% if failed_width > 0 %}
-                    <div style="width: {{ failed_width }}%; background: var(--danger-color);" title="Не складено: {{ exam_details.failed_count }}"></div>
+                    <div class="progress-segment segment-failed" style="width: {{ failed_width }}%;" title="Не складено: {{ exam_details.failed_count }}"></div>
                     {% endif %}
                     {% if in_progress_width > 0 %}
-                    <div style="width: {{ in_progress_width }}%; background: var(--warning-color);" title="В процесі: {{ exam_details.in_progress_count }}"></div>
+                    <div class="progress-segment segment-in-progress" style="width: {{ in_progress_width }}%;" title="В процесі: {{ exam_details.in_progress_count }}"></div>
                     {% endif %}
                     {% if not_started_width > 0 %}
-                    <div style="width: {{ not_started_width }}%; background: var(--secondary-color);" title="Не розпочали: {{ exam_details.not_started_count }}"></div>
+                    <div class="progress-segment segment-not-started" style="width: {{ not_started_width }}%;" title="Не розпочали: {{ exam_details.not_started_count }}"></div>
                     {% endif %}
                 </div>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--success-color); border-radius: 2px; margin-right: 0.25rem;"></span>Складено: {{ exam_details.passed_count }}</span>
-                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--danger-color); border-radius: 2px; margin-right: 0.25rem;"></span>Не складено: {{ exam_details.failed_count }}</span>
-                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--warning-color); border-radius: 2px; margin-right: 0.25rem;"></span>В процесі: {{ exam_details.in_progress_count }}</span>
-                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--secondary-color); border-radius: 2px; margin-right: 0.25rem;"></span>Не розпочали: {{ exam_details.not_started_count }}</span>
+                
+                <div class="progress-legend">
+                    <span class="legend-item">
+                        <span class="legend-dot" style="background: #059669;"></span>
+                        Складено: {{ exam_details.passed_count }}
+                    </span>
+                    <span class="legend-item">
+                        <span class="legend-dot" style="background: #dc2626;"></span>
+                        Не складено: {{ exam_details.failed_count }}
+                    </span>
+                    <span class="legend-item">
+                        <span class="legend-dot" style="background: #d97706;"></span>
+                        В процесі: {{ exam_details.in_progress_count }}
+                    </span>
+                    <span class="legend-item">
+                        <span class="legend-dot" style="background: #9ca3af;"></span>
+                        Не розпочали: {{ exam_details.not_started_count }}
+                    </span>
                 </div>
             </div>
 
-            <!-- Результати слухачів -->
-            <h3 style="margin-bottom: 1rem;">Результати слухачів</h3>
-            <div class="table-container">
-                <table class="table">
+            <!-- Таблиця результатів -->
+            <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 2rem 0 1rem 0;">
+                Результати слухачів
+            </h3>
+            <div style="overflow-x: auto;">
+                <table class="data-table-enhanced">
                     <thead>
                         <tr>
                             <th>Слухач</th>
-                            <th>Статус</th>
-                            <th>Результат</th>
-                            <th>Час</th>
-                            <th>Правильно</th>
-                            <th>Помилок</th>
-                            <th>Дії</th>
+                            <th style="text-align: center;">Статус</th>
+                            <th style="text-align: center;">Результат</th>
+                            <th style="text-align: center;">Час</th>
+                            <th style="text-align: center;">Правильно</th>
+                            <th style="text-align: center;">Помилок</th>
+                            <th style="text-align: center;">Дії</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in exam_details.student_results %}
                         <tr>
-                            <td>
-                                <strong>{{ item.student.get_full_name() or item.student.username }}</strong>
-                            </td>
-                            <td>
+                            <td style="font-weight: 500;">{{ item.student.get_full_name() or item.student.username }}</td>
+                            <td style="text-align: center;">
                                 {% if item.result %}
                                     {% if item.result.status == 'completed' %}
-                                        <span class="badge badge-success">Завершено</span>
+                                        <span class="status-badge status-completed">✓ Завершено</span>
                                     {% else %}
-                                        <span class="badge badge-warning">В процесі</span>
+                                        <span class="status-badge status-in-progress">⏳ В процесі</span>
                                     {% endif %}
                                 {% else %}
-                                    <span class="badge badge-secondary">Не розпочато</span>
+                                    <span class="status-badge status-not-started">— Не розпочато</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td style="text-align: center;">
                                 {% if item.result and item.result.status == 'completed' %}
                                     {% if item.result.is_passed %}
-                                        <span class="badge badge-success">✓ Складено</span>
+                                        <span class="result-passed">✓ Складено</span>
                                     {% else %}
-                                        <span class="badge badge-danger">✗ Не складено</span>
+                                        <span class="result-failed">✗ Не складено</span>
                                     {% endif %}
                                 {% else %}
-                                    —
+                                    <span style="color: var(--text-muted);">—</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% if item.result %}
-                                    {{ item.result.get_time_spent_formatted() }}
-                                {% else %}
-                                    —
-                                {% endif %}
+                            <td style="text-align: center; color: var(--text-secondary);">
+                                {{ item.result.get_time_spent_formatted() if item.result else '—' }}
                             </td>
-                            <td>
-                                {% if item.result %}
-                                    {{ item.result.correct_answers }}
-                                {% else %}
-                                    —
-                                {% endif %}
+                            <td style="text-align: center; font-weight: 600;">
+                                {{ item.result.correct_answers if item.result else '—' }}
                             </td>
-                            <td>
-                                {% if item.result %}
-                                    {{ item.result.errors_count }}
-                                {% else %}
-                                    —
-                                {% endif %}
+                            <td style="text-align: center; color: var(--danger-dark); font-weight: 600;">
+                                {{ item.result.errors_count if item.result else '—' }}
                             </td>
-                            <td class="actions">
+                            <td style="text-align: center;">
                                 {% if item.result %}
-                                    <a href="{{ url_for('main.school_exam_result', result_id=item.result.id) }}" class="btn btn-primary btn-xs" title="Переглянути">
-                                        👁️
+                                    <a href="{{ url_for('main.school_exam_result', result_id=item.result.id) }}" class="action-btn action-btn-view">
+                                        👁️ Переглянути
                                     </a>
                                     {% if current_user.role in ['school_admin', 'system_admin'] %}
-                                    <form method="POST" action="{{ url_for('main.reset_school_exam_result', result_id=item.result.id) }}" 
-                                          style="display: inline;"
-                                          onsubmit="return confirm('СКИНУТИ результат для &quot;{{ item.student.get_full_name() or item.student.username }}&quot;?')">
-                                        <button type="submit" class="btn btn-warning btn-xs" title="Скинути результат">
-                                            🔄
-                                        </button>
+                                    <form method="POST" action="{{ url_for('main.reset_school_exam_result', result_id=item.result.id) }}" style="display: inline; margin-left: 0.5rem;">
+                                        <button type="submit" class="action-btn action-btn-reset" onclick="return confirm('Скинути результат? Слухач зможе пройти іспит знову.')">
+                                            🔄 Скинути
+                                    </button>
                                     </form>
                                     {% endif %}
                                 {% else %}
-                                    <span style="color: var(--text-secondary);">—</span>
+                                    <span style="color: var(--text-muted);">—</span>
                                 {% endif %}
                             </td>
                         </tr>

@@ -104,6 +104,7 @@ let selectedAnswer = {% if existing_answer %}{{ existing_answer.selected_answer 
 let questionId = {{ question.id }};
 let remainingSeconds = {{ remaining_seconds }};
 let timerInterval;
+let isNavigatingNext = false;
 
 // Таймер
 function updateTimer() {
@@ -182,11 +183,15 @@ function goToNext() {
         return;
     }
     
+    isNavigatingNext = true;
     window.location.href = '{{ url_for('main.school_exam_next') }}';
 }
 
 // Попередження при спробі закрити сторінку
 window.addEventListener('beforeunload', function(e) {
+    if (isNavigatingNext) {
+        return;
+    }
     e.preventDefault();
     e.returnValue = '';
 });

@@ -4,85 +4,145 @@
 
 {% block content %}
 <div class="fade-in">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-        <h1>✏️ Редактор питань</h1>
-        <div style="display: flex; gap: 0.5rem;">
-            <a href="{{ url_for('main.add_question') }}" class="btn btn-success btn-sm">
-                <span>➕</span> Додати
-            </a>
-            <a href="{{ url_for('main.import_questions') }}" class="btn btn-primary btn-sm">
-                <span>📥</span> Імпорт
-            </a>
-            <div class="btn-group">
-                <button class="btn btn-outline btn-sm" onclick="exportData('json')">
-                    <span>📤</span> JSON
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="exportData('csv')">
-                    <span>📤</span> CSV
-                </button>
-            </div>
-        </div>
+            <!-- Кнопки дії -->
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <a href="{{ url_for('main.add_question') }}" class="btn btn-success btn-sm">
+            ➕ Додати
+        </a>
+        <a href="{{ url_for('main.import_questions') }}" class="btn btn-primary btn-sm">
+            📥 Імпорт
+        </a>
+        <button type="button" class="btn btn-outline-light btn-sm text-dark border" onclick="exportData('json')">
+            📤 JSON
+        </button>
+        <button type="button" class="btn btn-outline-light btn-sm text-dark border" onclick="exportData('csv')">
+            📤 CSV
+        </button>
     </div>
 
     <!-- Фільтри -->
     <div class="card" style="margin-bottom: 1.5rem;">
-        <form method="GET" action="{{ url_for('main.editor') }}" class="filters">
-            <div class="filter-group">
-                <label>Розділ:</label>
-                <select class="form-select" name="section" onchange="this.form.submit()">
-                    <option value="">Всі розділи</option>
-                    {% for section in sections %}
-                    <option value="{{ section }}" {% if section_filter == section %}selected{% endif %}>
-                        Розділ {{ section }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Категорія:</label>
-                <select class="form-select" name="category" onchange="this.form.submit()">
-                    <option value="">Всі категорії</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat.code }}" {% if category_filter == cat.code %}selected{% endif %}>
-                        {{ cat.name }} ({{ cat.code }})
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <a href="{{ url_for('main.editor') }}" class="btn btn-outline btn-sm">Скинути</a>
-            </div>
-        </form>
+        <div style="padding: 1rem;">
+            <form method="get" action="{{ url_for('main.editor') }}" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.25rem; font-size: 0.875rem;">Розділ:</label>
+                    <select name="section" class="form-select" style="width: 150px;" onchange="this.form.submit()">
+                        <option value="">Всі</option>
+                        {% for section in sections %}
+                        <option value="{{ section }}" {% if section == section_filter %}selected{% endif %}>
+                            {{ section }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.25rem; font-size: 0.875rem;">Категорія:</label>
+                    <select name="category" class="form-select" style="width: 150px;" onchange="this.form.submit()">
+                        <option value="">Всі</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.code }}" {% if cat.code == category_filter %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.editor') }}" class="btn btn-outline btn-sm">Скинути</a>
+                </div>
+            </form>
+        </div>
     </div>
+
+    <!-- Панель масових дій -->
+    <form method="POST" action="{{ url_for('main.delete_multiple_questions') }}" id="bulk-form">
+        <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            
+            <!-- Вибір всіх -->
+            <label style="display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem; cursor: pointer;">
+                <input type="checkbox" id="select-all" style="cursor: pointer;">
+                <span>Вибрати всі</span>
+            </label>
+
+            <span style="color: var(--text-secondary);">|</span>
+
+            <!-- Лічильник -->
+            <span id="selected-info" style="color: var(--text-secondary);">Вибрано: 0</span>
+
+            <span style="color: var(--text-secondary);">|</span>
+
+            <!-- Дії з категоріями -->
+            <button type="button" class="btn btn-sm" style="background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9;" 
+                    onclick="updateCategories('add', 'MS')" id="btn-add-ms" disabled>
+                🚤 Додати до МС
+            </button>
+            <button type="button" class="btn btn-sm" style="background: #fce4ec; color: #c2185b; border: 1px solid #f48fb1;" 
+                    onclick="updateCategories('add', 'GC')" id="btn-add-gc" disabled>
+                🏍️ Додати до ГЦ
+            </button>
+            <button type="button" class="btn btn-sm" style="background: #fff3e0; color: #ef6c00; border: 1px solid #ffcc80;" 
+                    onclick="updateCategories('remove', 'all')" id="btn-remove-cat" disabled>
+                ❌ Прибрати категорію
+            </button>
+
+            <span style="color: var(--text-secondary);">|</span>
+
+            <!-- Видалення -->
+            <button type="submit" class="btn btn-danger btn-sm" id="btn-delete" disabled
+                    onclick="return confirm('Видалити вибрані питання?')">
+                🗑️ Видалити
+            </button>
+        </div>
+
+        <!-- Прихована форма для оновлення категорій -->
+        <input type="hidden" name="question_ids" id="selected-ids">
+    </form>
+
+    <!-- Окрема форма для категорій (AJAX) -->
+    <form id="category-form" method="POST" action="{{ url_for('main.update_categories') }}" style="display: none;">
+        <input type="hidden" name="question_ids" id="cat-question-ids">
+        <input type="hidden" name="action" id="cat-action">
+        <input type="hidden" name="category_code" id="cat-code">
+    </form>
 
     <!-- Таблиця питань -->
     <div class="card">
         {% if questions.items %}
-        <div class="table-container">
-            <table class="table">
+        <div style="overflow-x: auto;">
+            <table class="table" style="margin: 0;">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Розділ</th>
+                        <th style="width: 30px; text-align: center;">
+                            <input type="checkbox" id="select-all-header" style="cursor: pointer;">
+                        </th>
+                        <th style="width: 50px;">ID</th>
+                        <th style="width: 60px;">Розділ</th>
                         <th>Питання</th>
-                        <th>Варіанти</th>
-                        <th style="text-align: center;">Прав.</th>
-                        <th style="text-align: center;">МС</th>
-                        <th style="text-align: center;">ГЦ</th>
-                        <th style="text-align: center;">📷</th>
-                        <th>Дії</th>
+                        <th style="width: 100px;">Варіанти</th>
+                        <th style="width: 50px; text-align: center;">Прав.</th>
+                        <th style="width: 40px; text-align: center;">МС</th>
+                        <th style="width: 40px; text-align: center;">ГЦ</th>
+                        <th style="width: 40px; text-align: center;">📷</th>
+                        <th style="width: 80px;">Дії</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for question in questions.items %}
                     {% set cat_codes = question.categories | map(attribute='code') | list %}
                     <tr>
+                        <td style="text-align: center;">
+                            <input type="checkbox" name="question_checkbox" value="{{ question.id }}" 
+                                   class="question-checkbox" style="cursor: pointer;"
+                                   data-has-ms="{{ 'MS' in cat_codes }}"
+                                   data-has-gc="{{ 'GC' in cat_codes }}">
+                        </td>
                         <td>{{ question.id }}</td>
-                        <td>{{ question.section }}</td>
-                        <td>{{ question.text[:60] }}{% if question.text|length > 60 %}...{% endif %}</td>
+                        <td style="text-align: center;">{{ question.section }}</td>
+                        <td>
+                            <small>{{ question.text[:60] }}{% if question.text|length > 60 %}...{% endif %}</small>
+                        </td>
                         <td>
                             <small style="color: var(--text-secondary);">
-                                1) {{ question.option1[:25] }}{% if question.option1|length > 25 %}...{% endif %}
+                                1) {{ question.option1[:20] }}{% if question.option1|length > 20 %}...{% endif %}
                             </small>
                         </td>
                         <td style="text-align: center; font-weight: 600;">{{ question.correct + 1 }}</td>
@@ -107,14 +167,14 @@
                             <span style="color: var(--border-color);">—</span>
                             {% endif %}
                         </td>
-                        <td class="actions">
+                        <td>
                             <a href="{{ url_for('main.edit_question', question_id=question.id) }}" 
                                class="btn btn-primary btn-xs" title="Редагувати">
                                 ✏️
                             </a>
                             <form method="POST" action="{{ url_for('main.delete_question', question_id=question.id) }}" 
                                   style="display: inline;"
-                                  onsubmit="return confirmDelete('Видалити це питання?')">
+                                  onsubmit="return confirm('Видалити це питання?')">
                                 <button type="submit" class="btn btn-danger btn-xs" title="Видалити">
                                     🗑️
                                 </button>
@@ -128,7 +188,7 @@
 
         <!-- Пагінація -->
         {% if questions.pages > 1 %}
-        <div class="pagination">
+        <div class="pagination" style="padding: 1rem; border-top: 1px solid var(--border-color);">
             {% if questions.has_prev %}
             <a href="{{ url_for('main.editor', page=questions.prev_num, section=section_filter, category=category_filter) }}" class="page-link">←</a>
             {% endif %}
@@ -151,12 +211,12 @@
         </div>
         {% endif %}
 
-        <div style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">
+        <div style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
             Показано {{ questions.items|length }} з {{ questions.total }} питань
         </div>
         {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon">📭</div>
+        <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
             <p>Немає питань для відображення</p>
             <a href="{{ url_for('main.add_question') }}" class="btn btn-primary" style="margin-top: 1rem;">
                 Додати перше питання
@@ -167,12 +227,96 @@
 </div>
 
 <script>
-function confirmDelete(message) {
-    return confirm(message);
+// Система вибору
+const selectAll = document.getElementById('select-all');
+const selectAllHeader = document.getElementById('select-all-header');
+const checkboxes = document.querySelectorAll('.question-checkbox');
+const selectedInfo = document.getElementById('selected-info');
+const selectedIdsInput = document.getElementById('selected-ids');
+const catQuestionIds = document.getElementById('cat-question-ids');
+
+// Кнопки
+const btnAddMs = document.getElementById('btn-add-ms');
+const btnAddGc = document.getElementById('btn-add-gc');
+const btnRemoveCat = document.getElementById('btn-remove-cat');
+const btnDelete = document.getElementById('btn-delete');
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.question-checkbox:checked')).map(cb => cb.value);
 }
 
+function updateUI() {
+    const selectedIds = getSelectedIds();
+    const count = selectedIds.length;
+    
+    // Оновлюємо лічильник та приховане поле
+    selectedInfo.textContent = `Вибрано: ${count}`;
+    selectedIdsInput.value = selectedIds.join(',');
+    catQuestionIds.value = selectedIds.join(',');
+    
+    // Активуємо/деактивуємо кнопки
+    const hasSelection = count > 0;
+    btnAddMs.disabled = !hasSelection;
+    btnAddGc.disabled = !hasSelection;
+    btnRemoveCat.disabled = !hasSelection;
+    btnDelete.disabled = !hasSelection;
+    
+    // Оновлюємо "вибрати всі"
+    const allChecked = count === checkboxes.length && count > 0;
+    selectAll.checked = allChecked;
+    selectAllHeader.checked = allChecked;
+    selectAll.indeterminate = count > 0 && !allChecked;
+    selectAllHeader.indeterminate = count > 0 && !allChecked;
+}
+
+// Обробники вибору
+selectAll.addEventListener('change', function() {
+    checkboxes.forEach(cb => cb.checked = this.checked);
+    updateUI();
+});
+
+selectAllHeader.addEventListener('change', function() {
+    checkboxes.forEach(cb => cb.checked = this.checked);
+    updateUI();
+});
+
+checkboxes.forEach(cb => {
+    cb.addEventListener('change', updateUI);
+});
+
+// Оновлення категорій
+function updateCategories(action, categoryCode) {
+    const ids = getSelectedIds();
+    if (ids.length === 0) {
+        alert('Виберіть хоча б одне питання');
+        return;
+    }
+    
+    let confirmMsg = '';
+    if (action === 'add' && categoryCode === 'MS') {
+        confirmMsg = `Додати ${ids.length} питань до категорії МС?`;
+    } else if (action === 'add' && categoryCode === 'GC') {
+        confirmMsg = `Додати ${ids.length} питань до категорії ГЦ?`;
+    } else {
+        confirmMsg = `Прибрати категорію з ${ids.length} питань?`;
+    }
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    // Заповнюємо форму та відправляємо
+    document.getElementById('cat-action').value = action;
+    document.getElementById('cat-code').value = categoryCode;
+    document.getElementById('category-form').submit();
+}
+
+// Експорт
 function exportData(format) {
     window.location.href = `/export/${format}`;
 }
+
+// Ініціалізація
+updateUI();
 </script>
 {% endblock %}

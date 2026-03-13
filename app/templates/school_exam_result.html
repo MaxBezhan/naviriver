@@ -1,63 +1,294 @@
 {% extends "base.html" %}
 
-{% block title %}Результат іспиту - {{ exam.name }} - Тренажер для судноводіїв{% endblock %}
+{% block title %}Результат іспиту - {{ result.id }} - Тренажер для судноводіїв{% endblock %}
 
 {% block content %}
-<div class="fade-in">
+<style>
+/* Стилі для екрану */
+.exam-result-screen {
+    --border-color: #d1d5db;
+    --bg-light: #f8f9fa;
+    --text-primary: #1f2937;
+    --text-secondary: #4b5563;
+    --success-color: #059669;
+    --danger-color: #dc2626;
+}
+
+/* Кнопка друку */
+.print-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.print-btn:hover {
+    background: #1d4ed8;
+}
+
+/* Стилі для друку */
+@media print {
+    /* Скидання стилів */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    /* Приховуємо навігацію та кнопки */
+    .navbar,
+    .print-btn,
+    .btn,
+    .font-size-controls {
+        display: none !important;
+    }
+    
+    /* Основні налаштування сторінки */
+    body {
+        background: white !important;
+        font-size: 11pt;
+        line-height: 1.4;
+        color: #000 !important;
+    }
+    
+    .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Заголовок */
+    h1 {
+        font-size: 16pt !important;
+        margin-bottom: 12pt !important;
+        text-align: center;
+    }
+    
+    /* Інформаційний блок */
+    .result-header {
+        border: 1pt solid #333 !important;
+        padding: 10pt !important;
+        margin-bottom: 12pt !important;
+        page-break-inside: avoid;
+    }
+    
+    .result-header h2 {
+        font-size: 13pt !important;
+        margin-bottom: 8pt !important;
+    }
+    
+    /* Сітка інформації */
+    .info-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6pt !important;
+    }
+    
+    .info-item {
+        break-inside: avoid;
+    }
+    
+    .info-item p:first-child {
+        font-size: 9pt !important;
+        color: #555 !important;
+        margin-bottom: 2pt !important;
+    }
+    
+    .info-item p:last-child {
+        font-size: 11pt !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Питання - ключове правило для переносу */
+    .question-block {
+        border: 1pt solid #333 !important;
+        padding: 10pt !important;
+        margin-bottom: 10pt !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    
+    .question-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 8pt !important;
+        border-bottom: 0.5pt solid #999 !important;
+        padding-bottom: 6pt !important;
+    }
+    
+    .question-header h3 {
+        font-size: 12pt !important;
+        margin: 0 !important;
+    }
+    
+    /* Текст питання */
+    .question-text {
+        font-size: 11pt !important;
+        line-height: 1.4 !important;
+        margin-bottom: 8pt !important;
+        text-align: justify;
+    }
+    
+    /* Варіанти відповідей */
+    .options-block {
+        border: 0.5pt solid #666 !important;
+        padding: 8pt !important;
+        background: #fafafa !important;
+    }
+    
+    .options-block p {
+        font-size: 10pt !important;
+        font-weight: 600 !important;
+        margin-bottom: 6pt !important;
+    }
+    
+    .option-item {
+        padding: 5pt !important;
+        margin-bottom: 4pt !important;
+        border: 0.5pt solid #ccc !important;
+        font-size: 10pt !important;
+        line-height: 1.3 !important;
+    }
+    
+    /* Позначення правильних/неправильних відповідей для Ч/Б друку */
+    .option-correct {
+        background: #e8e8e8 !important;
+        border: 1.5pt solid #333 !important;
+        font-weight: 600 !important;
+    }
+    
+    .option-correct::after {
+        content: " [ПРАВИЛЬНО]" !important;
+        font-size: 9pt !important;
+        font-weight: 700 !important;
+    }
+    
+    .option-wrong {
+        background: #f5f5f5 !important;
+        border: 0.5pt solid #999 !important;
+    }
+    
+    .option-wrong::after {
+        content: " [Ваш вибір]" !important;
+        font-size: 9pt !important;
+        font-style: italic !important;
+    }
+    
+    /* Статуси */
+    .status-badge {
+        border: 1pt solid #333 !important;
+        padding: 3pt 8pt !important;
+        font-size: 10pt !important;
+        font-weight: 600 !important;
+    }
+    
+    .status-success {
+        background: #e8e8e8 !important;
+    }
+    
+    .status-fail {
+        background: #f0f0f0 !important;
+    }
+    
+    /* Розриви сторінок */
+    .page-break {
+        page-break-before: always !important;
+    }
+    
+    /* Заголовок секції з питаннями */
+    .questions-section-title {
+        font-size: 14pt !important;
+        margin: 12pt 0 8pt 0 !important;
+        border-bottom: 1pt solid #333 !important;
+        padding-bottom: 4pt !important;
+        page-break-after: avoid !important;
+    }
+    
+    /* Футер друку */
+    .print-footer {
+        display: block !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        font-size: 8pt !important;
+        color: #666 !important;
+        border-top: 0.5pt solid #999 !important;
+        padding-top: 5pt !important;
+        margin-top: 10pt !important;
+    }
+    
+    .print-footer::after {
+        content: "Сторінка " counter(page) " з " counter(pages) !important;
+    }
+}
+
+/* Приховуємо футер на екрані */
+.print-footer {
+    display: none;
+}
+</style>
+
+<div class="exam-result-screen fade-in">
+    <!-- Заголовок з кнопкою друку -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h1>📊 Результат іспиту</h1>
-        <div>
-            {% if current_user.role == 'student' %}
-            <a href="{{ url_for('main.my_school_exams') }}" class="btn btn-outline">
-                <span>←</span> Назад до іспитів
+        <div style="display: flex; gap: 0.75rem;">
+            <button onclick="window.print()" class="print-btn">
+                🖨️ Друкувати
+            </button>
+            <a href="{{ url_for('main.my_school_exams') }}" class="btn btn-outline no-print">
+                ← Назад до іспитів
             </a>
-            {% else %}
-            <a href="{{ url_for('main.school_exams_results') }}" class="btn btn-outline">
-                <span>←</span> Назад до результатів
-            </a>
-            {% endif %}
         </div>
     </div>
 
     <!-- Загальна інформація -->
-    <div class="card" style="margin-bottom: 1.5rem; {% if result.is_passed %}border-left: 4px solid var(--success-color);{% else %}border-left: 4px solid var(--danger-color);{% endif %}">
-        <div class="card-header">
+    <div class="card result-header" style="margin-bottom: 1.5rem; border-left: 4px solid {{ 'var(--success-color)' if result.is_passed else 'var(--danger-color)' }};">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <h2 class="card-title">{{ exam.name }}</h2>
-            <span class="badge badge-{{ 'success' if result.is_passed else 'danger' }}" style="font-size: 1rem;">
+            <span class="badge {{ 'badge-success' if result.is_passed else 'badge-danger' }}" style="font-size: 1rem;">
                 {{ '✓ Іспит складено' if result.is_passed else '✗ Іспит не складено' }}
             </span>
         </div>
         <div style="padding: 1.5rem;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
-                <div>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Слухач</p>
+            <div class="info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                <div class="info-item">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem; font-size: 0.9rem;">Слухач</p>
                     <p style="font-size: 1.1rem; font-weight: 600;">
                         {{ result.user.get_full_name() or result.user.username }}
                     </p>
                 </div>
-                <div>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Група</p>
+                <div class="info-item">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem; font-size: 0.9rem;">Група</p>
                     <p style="font-size: 1.1rem; font-weight: 600;">{{ exam.group.name }}</p>
                 </div>
-                <div>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Категорія судна</p>
+                <div class="info-item">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem; font-size: 0.9rem;">Категорія судна</p>
                     <p style="font-size: 1.1rem; font-weight: 600;">{{ exam.category.name }}</p>
                 </div>
-                <div>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Дата проходження</p>
+                <div class="info-item">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem; font-size: 0.9rem;">Дата проходження</p>
                     <p style="font-size: 1.1rem; font-weight: 600;">
-                        {{ result.completed_at.strftime('%d.%m.%Y %H:%M') }}
+                        {{ result.completed_at.strftime('%d.%m.%Y %H:%M') if result.completed_at else '—' }}
                     </p>
                 </div>
-                <div>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Час проходження</p>
+                <div class="info-item">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem; font-size: 0.9rem;">Час проходження</p>
                     <p style="font-size: 1.1rem; font-weight: 600;">{{ result.get_time_spent_formatted() }}</p>
                 </div>
-                <div>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">Результат</p>
+                <div class="info-item">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem; font-size: 0.9rem;">Результат</p>
                     <p style="font-size: 1.1rem; font-weight: 600;">
                         {{ result.correct_answers }} правильно / {{ result.errors_count }} помилок
-                        <br><small style="color: var(--text-secondary);">(допустимо: {{ exam.max_errors }})</small>
+                        <br><small style="color: var(--text-secondary); font-weight: 400;">(допустимо: {{ exam.max_errors }})</small>
                     </p>
                 </div>
             </div>
@@ -70,51 +301,78 @@
             <h2 class="card-title">📝 Деталі відповідей</h2>
         </div>
         
-        {% if answers %}
         <div style="padding: 1rem;">
             {% for answer in answers %}
-            <div style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color); {% if not loop.last %}margin-bottom: 2rem;{% else %}border-bottom: none;{% endif %}">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">Питання {{ loop.index }}</h3>
-                    <span class="badge badge-{{ 'success' if answer.is_correct else 'danger' }}">
+            <div class="question-block" style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color); {% if loop.last %}border-bottom: none;{% endif %}">
+                <div class="question-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <h3 style="margin: 0; font-size: 1.1rem;">Питання {{ loop.index }}</h3>
+                    <span class="badge {{ 'badge-success' if answer.is_correct else 'badge-danger' }} status-badge">
                         {{ '✓ Правильно' if answer.is_correct else '✗ Неправильно' }}
                     </span>
                 </div>
                 
-                <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1rem;">
+                <p class="question-text" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1rem;">
                     {{ answer.question.text }}
                 </p>
                 
-                {% if answer.question.image %}
-                <div style="text-align: center; margin-bottom: 1rem;">
-                    <img src="data:image/jpeg;base64,{{ answer.question.image }}" 
+                {% if answer.question.image_base64 %}
+                <div style="text-align: center; margin-bottom: 1rem;" class="no-print">
+                    <img src="{{ answer.question.image_base64 }}" 
                          alt="Зображення до питання" 
                          style="max-width: 100%; max-height: 300px; border-radius: 8px;">
                 </div>
                 {% endif %}
                 
-                <div style="background: var(--bg-color); padding: 1rem; border-radius: 8px;">
-                    <p style="margin-bottom: 0.5rem;"><strong>Варіанти відповідей:</strong></p>
-                    {% set options = [answer.question.option1, answer.question.option2, answer.question.option3] %}
-                    {% for i in range(3) %}
-                    <div style="padding: 0.5rem; margin-bottom: 0.25rem; border-radius: 4px;
-                        {% if i == answer.question.correct %}background: rgba(40, 167, 69, 0.2); border: 1px solid var(--success-color);{% endif %}
-                        {% if i == answer.selected_answer and not answer.is_correct %}background: rgba(220, 53, 69, 0.2); border: 1px solid var(--danger-color);{% endif %}">
-                        <span style="font-weight: 600;">{{ ['A', 'B', 'C'][i] }}.</span> {{ options[i] }}
-                        {% if i == answer.question.correct %}<span style="color: var(--success-color); margin-left: 0.5rem;">✓ Правильна відповідь</span>{% endif %}
-                        {% if i == answer.selected_answer and not answer.is_correct %}<span style="color: var(--danger-color); margin-left: 0.5rem;">✗ Ваш вибір</span>{% endif %}
+                <div class="options-block" style="background: var(--bg-color); padding: 1rem; border-radius: 8px;">
+                    <p style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Варіанти відповідей:</p>
+                    
+                    {% set options = answer.question.get_options() %}
+                    {% for option in options %}
+                    {% set idx = loop.index0 %}
+                    {% set is_correct = (idx == answer.question.correct) %}
+                    {% set is_selected = (idx == answer.selected_answer) %}
+                    
+                    <div class="option-item {% if is_correct %}option-correct{% elif is_selected %}option-wrong{% endif %}" 
+                         style="padding: 0.5rem; margin-bottom: 0.25rem; border-radius: 4px;
+                         {% if is_correct %}
+                         background: rgba(40, 167, 69, 0.15); border: 1px solid var(--success-color);
+                         {% elif is_selected %}
+                         background: rgba(220, 53, 69, 0.15); border: 1px solid var(--danger-color);
+                         {% else %}
+                         border: 1px solid transparent;
+                         {% endif %}">
+                        <span style="font-weight: 600;">{{ ['A', 'B', 'C'][idx] }}.</span> {{ option }}
+                        
+                        {% if is_correct %}
+                        <span style="color: var(--success-color); margin-left: 0.5rem; font-weight: 600;">✓ Правильна відповідь</span>
+                        {% endif %}
+                        
+                        {% if is_selected and not is_correct %}
+                        <span style="color: var(--danger-color); margin-left: 0.5rem; font-weight: 600;">✗ Ваш вибір</span>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
             </div>
             {% endfor %}
         </div>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon">📝</div>
-            <p>Немає даних про відповіді</p>
-        </div>
-        {% endif %}
+    </div>
+    
+    <!-- Футер для друку -->
+    <div class="print-footer">
+        Результат іспиту: {{ exam.name }} | Слухач: {{ result.user.get_full_name() or result.user.username }} | Дата: {{ result.completed_at.strftime('%d.%m.%Y') if result.completed_at else '—' }}
     </div>
 </div>
+
+<script>
+// Додаткова обробка перед друком
+window.addEventListener('beforeprint', function() {
+    // Перевіряємо, чи всі зображення завантажені
+    document.querySelectorAll('img').forEach(img => {
+        if (!img.complete) {
+            img.style.display = 'none';
+        }
+    });
+});
+</script>
 {% endblock %}
